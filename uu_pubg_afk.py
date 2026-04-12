@@ -14,14 +14,23 @@ print("OCR 模型加载完成！")
 def get_remote_window():
     """
     智能查找实际的远程桌面窗口，排除控制面板。
-    逻辑：查找标题包含 'UU' 或 '远程'，且窗口尺寸较大的目标。
+    根据网易UU远程的进程特性，控制面板标题通常叫“网易UU远程”，
+    而实际的远程控制窗口标题通常包含远控设备的名称（如 "HOME"）。
+    由于标题可能变动，我们会扩大搜索范围，并利用窗口尺寸过滤控制面板。
     """
-    # 获取所有包含可能关键字的窗口
-    possible_windows = gw.getWindowsWithTitle('UU') + gw.getWindowsWithTitle('远程')
+    # 尝试查找包含常见关键字的窗口
+    # HOME 是用户提供的特定远控窗口名，加入通用关键字保证兼容性
+    possible_windows = []
+    for title in ['HOME', 'UU', '远程', '网易UU远程']:
+        possible_windows.extend(gw.getWindowsWithTitle(title))
     
-    for win in possible_windows:
-        # 排除掉小尺寸的控制面板 (假设远程桌面窗口宽度至少大于 800，高度大于 600)
-        if win.width > 800 and win.height > 600:
+    # 去重
+    unique_windows = list({win._hWnd: win for win in possible_windows}.values())
+    
+    for win in unique_windows:
+        # 排除掉小尺寸的控制面板 (网易UU远程控制面板较小，远控窗口通常 > 800x600)
+        # 同时排除掉看不见的窗口
+        if win.width > 800 and win.height > 600 and win.visible:
             return win
     return None
 
