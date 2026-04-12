@@ -1,0 +1,6 @@
+pygetwindow
+pydirectinput
+easyocr
+Pillow
+numpy
+opencv-python
