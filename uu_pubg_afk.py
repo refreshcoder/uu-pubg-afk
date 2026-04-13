@@ -158,6 +158,12 @@ def should_run_ocr(last_ocr_time):
 
 def safety_movement(win):
     """执行极短防掉线动作 (原地踏步)"""
+    dx = random.randint(-60, 60)
+    dy = random.randint(-20, 20)
+    center_x = win.left + win.width // 2
+    center_y = win.top + win.height // 2
+    pydirectinput.moveTo(center_x + dx, center_y + dy, duration=0.2)
+
     keys = ['w', 's', 'a', 'd']
     k = random.choice(keys)
     hold_time = random.uniform(0.1, 0.18)
@@ -172,12 +178,6 @@ def safety_movement(win):
     pydirectinput.keyDown(opp_map[k])
     time.sleep(hold_time)
     pydirectinput.keyUp(opp_map[k])
-
-    dx = random.randint(-60, 60)
-    dy = random.randint(-20, 20)
-    center_x = win.left + win.width // 2
-    center_y = win.top + win.height // 2
-    pydirectinput.moveTo(center_x + dx, center_y + dy, duration=0.2)
 
 def main():
     print("=== UU远程 PUBG 防掉线助手已启动 ===")
