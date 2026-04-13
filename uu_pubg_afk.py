@@ -59,7 +59,7 @@ def check_kicked_with_ocr(win):
     results = reader.readtext(img_np, detail=1)
     
     # 触发关键词
-    keywords = ["异常", "断开", "连接", "确定", "踢出", "返回"]
+    keywords = ["错误"]
     
     for bbox_coords, text, prob in results:
         for key in keywords:
