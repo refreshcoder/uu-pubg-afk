@@ -132,7 +132,7 @@ def check_kicked_with_ocr(win):
     img_np = np.array(screen)
     results = reader.readtext(img_np, detail=1)
 
-    keywords = ["错误"]
+    keywords = ["错误", "錯誤", "Error", "error"]
 
     for bbox_coords, text, prob in results:
         for key in keywords:
