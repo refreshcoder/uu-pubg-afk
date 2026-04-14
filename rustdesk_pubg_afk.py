@@ -2,13 +2,22 @@ import subprocess
 import pyautogui
 import easyocr
 import numpy as np
-from PIL import ImageGrab
+import mss
 import random
 import time
 import os
 import sys
+import argparse
 
-# 初始化 OCR 引擎 (首次运行会自动下载模型)
+# 接收 CLI 命令行参数
+parser = argparse.ArgumentParser(description='RustDesk PUBG Anti-AFK Script (Linux CLI Mode)')
+parser.add_argument('--display', type=str, default=':0', help='指定 X11 DISPLAY 环境变量 (默认: :0)')
+args = parser.parse_args()
+
+# 强制将所有 GUI 操作绑定到指定的 Display
+os.environ['DISPLAY'] = args.display
+
+# 初始化 OCR 引擎
 print("正在加载 OCR 模型...")
 reader = easyocr.Reader(['ch_sim', 'en'])
 print("OCR 模型加载完成！")
@@ -16,9 +25,8 @@ print("OCR 模型加载完成！")
 OCR_INTERVAL_SECONDS = 10 * 60
 
 def is_x11():
-    """检查是否为 X11 环境，Wayland 环境下 pyautogui 可能无法正常工作。"""
-    session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
-    return session_type == 'x11'
+    """检查当前是否为 X11 运行环境"""
+    return os.environ.get('DISPLAY') is not None
 
 def get_rustdesk_window():
     """
@@ -84,15 +92,23 @@ def check_kicked_with_ocr(win_info):
     x2 = win_info['left'] + (win_info['width'] * 0.75)
     y2 = win_info['top'] + (win_info['height'] * 0.75)
     
-    bbox = (int(x1), int(y1), int(x2), int(y2))
+    # mss 使用 top/left/width/height 的格式
+    monitor = {
+        "top": int(y1),
+        "left": int(x1),
+        "width": int(x2 - x1),
+        "height": int(y2 - y1)
+    }
     
     try:
-        screen = ImageGrab.grab(bbox=bbox)
+        with mss.mss() as sct:
+            sct_img = sct.grab(monitor)
+            # mss 输出 BGRA 格式，需要转换以供 easyocr 使用
+            img_np = np.array(sct_img)
     except Exception as e:
-        print(f"截图失败 (可能是在 Wayland 环境): {e}")
+        print(f"截图失败 (可能无权限访问 X Display 或 X11 环境未启动): {e}")
         return False
         
-    img_np = np.array(screen)
     results = reader.readtext(img_np, detail=1)
     
     keywords = ["错误", "錯誤", "Error", "error", "异常", "断开"]
@@ -149,14 +165,17 @@ def safety_movement(win_info):
     pyautogui.keyUp(opp_map[k])
 
 def main():
-    print("=== RustDesk PUBG 防掉线助手 (Linux) 已启动 ===")
+    print(f"=== RustDesk PUBG 防掉线助手 (Linux CLI 模式) 已启动 ===")
+    print(f"当前绑定的 X11 Display: {os.environ.get('DISPLAY')}")
+    
     if not is_x11():
-        print("警告: 检测到您可能正在使用 Wayland 桌面环境。")
-        print("由于 Wayland 的安全限制，pyautogui 和 xdotool 可能无法正常控制窗口和鼠标。")
-        print("建议在登录界面切换为 Xorg/X11 会话以获得最佳体验。")
+        print("错误: 未检测到 DISPLAY 环境变量。")
+        print("如果您通过 SSH 连接，请确保设置了正确的 DISPLAY (例如 export DISPLAY=:0) ")
+        print("或者通过参数传递: python3 rustdesk_pubg_afk.py --display :0")
+        sys.exit(1)
         
     print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")
-    print("依赖检查: 请确保系统中已安装 xdotool 和 scrot (用于截图)。")
+    print("依赖检查: 请确保系统中已安装 xdotool (用于窗口焦点控制)。")
     print("OCR 检测频率：每 10 分钟最多执行一次。")
     
     last_ocr_time = None

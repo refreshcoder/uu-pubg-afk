@@ -35,11 +35,11 @@
    pip install -r requirements.txt
    ```
 
-### Linux (RustDesk 远控版)
-1. 确保您的系统为 X11 / Xorg 环境 (Wayland由于安全限制可能无法正常使用鼠标模拟)。
-2. 安装系统依赖（如 `xdotool` 和 `scrot` 用于窗口控制和截图）：
+### Linux (RustDesk 远控版 - 纯 CLI 模式兼容)
+1. 确保您的系统为 X11 / Xorg 环境。若您在 SSH 或纯终端下运行，脚本已自动适配环境变量。
+2. 安装系统依赖（如 `xdotool` 用于窗口焦点控制）：
    ```bash
-   sudo apt-get install xdotool scrot python3-tk python3-dev
+   sudo apt-get install xdotool python3-tk python3-dev
    ```
 3. 克隆并进入目录：
    ```bash
@@ -60,10 +60,11 @@
      ```bash
      python uu_pubg_afk.py
      ```
-   - **Linux (RustDesk)**：打开终端运行：
+   - **Linux (RustDesk)**：通过终端或 SSH 运行：
      ```bash
      python3 rustdesk_pubg_afk.py
      ```
+     *(如果您是通过 SSH 运行，且桌面的 DISPLAY 并非默认的 `:0`，您可以使用参数指定：`python3 rustdesk_pubg_afk.py --display :1`)*
 4. **停止运行**：在终端中按下 `Ctrl + C` 即可安全停止脚本。
 
 ## ⚠️ 注意事项
