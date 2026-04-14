@@ -96,12 +96,16 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     if pgrep -x "Xvfb" > /dev/null; then
         echo -e "${YELLOW}[提示] Xvfb 已经在运行。${NC}"
     else
-        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        Xvfb :99 -screen 0 1920x1080x24 -ac -nolisten tcp > /dev/null 2>&1 &
         XVFB_PID=$!
         sleep 2
     fi
     DISPLAY_ARG=":99"
     export DISPLAY=":99"
+
+    XAUTHORITY_PATH="${XAUTHORITY:-$HOME/.Xauthority}"
+    export XAUTHORITY="$XAUTHORITY_PATH"
+    touch "$XAUTHORITY" 2>/dev/null || true
     
     # 启动 x11vnc 提供远程连接
     if pgrep -x "x11vnc" > /dev/null; then
@@ -113,8 +117,10 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     
     # 交互获取 RustDesk 连接参数
     echo -e "\n${YELLOW}为方便一键挂机，请输入被控端 (游戏主机) 的 RustDesk 信息：${NC}"
-    read -p "被控端 ID (如 123456789): " RUSTDESK_ID
-    read -p "被控端 密码 (如 password): " RUSTDESK_PWD
+    read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
+    RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
+    read -r -s -p "被控端 密码: " RUSTDESK_PWD
+    echo
     
     if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
         echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"

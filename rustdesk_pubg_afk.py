@@ -10,6 +10,15 @@ args = parser.parse_args()
 # 强制将所有 GUI 操作绑定到指定的 Display
 os.environ['DISPLAY'] = args.display
 
+XAUTHORITY_PATH = os.environ.get('XAUTHORITY') or os.path.expanduser('~/.Xauthority')
+os.environ['XAUTHORITY'] = XAUTHORITY_PATH
+try:
+    os.makedirs(os.path.dirname(XAUTHORITY_PATH), exist_ok=True)
+    with open(XAUTHORITY_PATH, 'a', encoding='utf-8'):
+        pass
+except Exception:
+    pass
+
 import subprocess
 import pyautogui
 import easyocr
