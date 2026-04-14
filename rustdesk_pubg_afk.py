@@ -42,13 +42,35 @@ def get_rustdesk_window():
     """
     通过 xdotool 查找 RustDesk 远程控制窗口
     """
+    if os.environ.get('DISPLAY') == ':99':
+        return {
+            'id': None,
+            'left': 0,
+            'top': 0,
+            'width': 1920,
+            'height': 1080,
+        }
+
     try:
-        # 查找包含 RustDesk 关键字的窗口
-        output = subprocess.check_output(['xdotool', 'search', '--name', 'RustDesk'], text=True)
-        win_ids = output.strip().split('\n')
+        queries = [
+            ['xdotool', 'search', '--name', 'RustDesk'],
+            ['xdotool', 'search', '--name', 'rustdesk'],
+            ['xdotool', 'search', '--class', 'RustDesk'],
+            ['xdotool', 'search', '--class', 'rustdesk'],
+        ]
+
+        win_ids = []
+        for query in queries:
+            try:
+                output = subprocess.check_output(query, text=True)
+                win_ids.extend([w for w in output.strip().split('\n') if w])
+            except subprocess.CalledProcessError:
+                continue
+
+        if not win_ids:
+            return None
         
         for win_id in win_ids:
-            if not win_id: continue
             # 获取窗口几何信息
             geom_output = subprocess.check_output(['xdotool', 'getwindowgeometry', win_id], text=True)
             # 解析几何信息
@@ -88,6 +110,9 @@ def focus_window(win_info):
     # 如果是纯无头 Xvfb 模式，通常全屏且只有一个应用在运行，不需要激活窗口，直接返回 True 提升性能
     if os.environ.get('DISPLAY') == ':99':
         return True
+
+    if not win_info or not win_info.get('id'):
+        return False
         
     try:
         subprocess.check_call(['xdotool', 'windowactivate', '--sync', win_info['id']])

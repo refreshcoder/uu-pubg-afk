@@ -79,16 +79,20 @@ if [ $? -ne 0 ]; then
 fi
 echo "Python 依赖安装完成！"
 
-# 5. 交互式启动配置
+# 5. 启动配置
 echo -e "\n${GREEN}[4/4] 准备启动脚本...${NC}"
 echo -e "${YELLOW}请确认您的系统环境：${NC}"
-echo "1. 拥有真实桌面环境 (GUI): 请直接回车（默认 :0）。"
-echo "2. 纯命令行服务器 (无头/SSH): 请输入 'xvfb'，我们将为您全自动配置虚拟桌面+远程访问。"
+echo "将自动检测是否存在可用的 X11 桌面："
+echo "- 若存在 DISPLAY 且对应 X socket 可用：直接使用现有桌面"
+echo "- 否则：自动启动 Xvfb 无头虚拟桌面 (:99) 并开启 VNC (5900)"
 
-read -p "请输入 DISPLAY 编号或输入 'xvfb' (默认 :0): " USER_DISPLAY
-USER_DISPLAY=${USER_DISPLAY:-":0"}
+DISPLAY_SOCKET=""
+if [ -n "$DISPLAY" ]; then
+    DISPLAY_NUM="$(echo "$DISPLAY" | sed 's/^://; s/\\..*$//')"
+    DISPLAY_SOCKET="/tmp/.X11-unix/X${DISPLAY_NUM}"
+fi
 
-if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
+if [ -z "$DISPLAY" ] || [ -n "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; then
     echo -e "\n${BLUE}================ 无头服务器保姆级模式 =================${NC}"
     echo -e "${GREEN}正在为您在后台启动 Xvfb 虚拟显示器 (:99)...${NC}"
     
@@ -116,18 +120,30 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     fi
     
     # 交互获取 RustDesk 连接参数
-    echo -e "\n${YELLOW}为方便一键挂机，请输入被控端 (游戏主机) 的 RustDesk 信息：${NC}"
-    read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
-    RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
-    read -r -s -p "被控端 密码: " RUSTDESK_PWD
-    echo
-    
-    if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
-        echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
-        rustdesk --connect $RUSTDESK_ID --password $RUSTDESK_PWD > /dev/null 2>&1 &
-        sleep 5
+    if ! command -v rustdesk > /dev/null 2>&1; then
+        echo -e "\n${YELLOW}[警告] 未检测到 rustdesk 命令。请先在该服务器安装 RustDesk 客户端后再继续。${NC}"
+        echo -e "${YELLOW}当前仍会启动挂机脚本，但需要您自行确保 RustDesk 画面已存在于 :99。${NC}"
     else
-        echo -e "${YELLOW}[警告] 您未输入完整的 ID 或密码，稍后请手动在终端中输入 DISPLAY=:99 rustdesk 启动。${NC}"
+        echo -e "\n${YELLOW}为方便一键挂机，请输入被控端 (游戏主机) 的 RustDesk 信息：${NC}"
+        if [ -z "$RUSTDESK_ID" ]; then
+            read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
+        fi
+        RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
+        if [ -z "$RUSTDESK_PWD" ]; then
+            read -r -s -p "被控端 密码: " RUSTDESK_PWD
+            echo
+        fi
+    
+        if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
+            echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
+            DISPLAY=:99 rustdesk --connect "$RUSTDESK_ID" --password "$RUSTDESK_PWD" > /dev/null 2>&1 &
+            sleep 5
+            if ! pgrep -f "rustdesk" > /dev/null 2>&1; then
+                echo -e "${YELLOW}[警告] rustdesk 进程未检测到。可能是参数不兼容或程序启动失败。${NC}"
+            fi
+        else
+            echo -e "${YELLOW}[警告] 您未输入完整的 ID 或密码，稍后请手动在终端中输入 DISPLAY=:99 rustdesk 启动。${NC}"
+        fi
     fi
     
     # 获取本机IP以供提示
@@ -147,7 +163,7 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     
     read -p "如果您已经配置好 RustDesk 画面，请按回车键开始防掉线挂机..." DUMMY
 else
-    DISPLAY_ARG=$USER_DISPLAY
+    DISPLAY_ARG="${DISPLAY:-:0}"
 fi
 
 echo -e "\n${BLUE}正在启动防掉线脚本 (使用 DISPLAY=$DISPLAY_ARG)...${NC}"
