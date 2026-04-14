@@ -185,7 +185,9 @@ def main():
         while True:
             win_info = get_rustdesk_window()
             if not win_info:
-                print(f"[{time.strftime('%H:%M:%S')}] 未找到符合条件的 RustDesk 窗口，请检查 RustDesk 是否已连接远控...")
+                print(f"[{time.strftime('%H:%M:%S')}] 未找到符合条件的 RustDesk 窗口...")
+                print(" -> 请确保您的 RustDesk 在当前 DISPLAY 运行并已连接到被控端。")
+                print(" -> (如果您使用的是无头服务器的 Xvfb 模式，请使用其他客户端连接到此虚拟桌面打开远控)。")
                 time.sleep(10)
                 continue
                 

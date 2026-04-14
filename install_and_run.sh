@@ -21,10 +21,10 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${YELLOW}[提示] 您当前不是 root 用户。如果系统缺少依赖，后续步骤可能会提示您输入 sudo 密码。${NC}"
 fi
 
-# 2. 检查并安装系统级依赖 (xdotool, python3, pip, python3-tk)
+# 2. 检查并安装系统级依赖 (xdotool, xvfb, python3, pip, python3-tk)
 echo -e "\n${GREEN}[1/4] 检查系统依赖...${NC}"
 
-REQUIRED_PKGS="xdotool python3 python3-pip python3-tk python3-dev python3-venv"
+REQUIRED_PKGS="xdotool xvfb python3 python3-pip python3-tk python3-dev python3-venv"
 MISSING_PKGS=""
 
 for pkg in $REQUIRED_PKGS; do
@@ -81,18 +81,39 @@ echo "Python 依赖安装完成！"
 # 5. 交互式启动配置
 echo -e "\n${GREEN}[4/4] 准备启动脚本...${NC}"
 echo -e "${YELLOW}请确认您的系统环境：${NC}"
-echo "如果您在桌面环境的终端中运行，或者您通过 SSH 连接但桌面编号为默认的 :0"
-echo "您可以直接按回车键启动。"
-echo -e "如果您的显示器编号不同（例如虚拟显示器 :1），请手动输入编号。\n"
+echo "1. 如果您在拥有桌面环境的 Linux 中运行，并且希望直接控制当前桌面，请输入对应的 DISPLAY 编号（通常为 :0 或 :1）。"
+echo "2. 如果您在纯命令行/无桌面的服务器（如云主机）中运行，请输入 'xvfb'，我们将为您在后台创建一个虚拟显示器。"
 
-read -p "请输入 DISPLAY 环境变量 (直接回车默认 :0): " USER_DISPLAY
-DISPLAY_ARG=${USER_DISPLAY:-":0"}
+read -p "请输入 DISPLAY 编号或输入 'xvfb' (默认 :0): " USER_DISPLAY
+USER_DISPLAY=${USER_DISPLAY:-":0"}
+
+if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
+    echo -e "\n${BLUE}正在启动 Xvfb 虚拟显示器 (:99)...${NC}"
+    # 检查是否已有 Xvfb 在运行
+    if pgrep -x "Xvfb" > /dev/null; then
+        echo -e "${YELLOW}[提示] Xvfb 已经在运行。${NC}"
+    else
+        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        XVFB_PID=$!
+        sleep 2
+        echo "Xvfb 启动成功 (PID: $XVFB_PID)"
+    fi
+    DISPLAY_ARG=":99"
+else
+    DISPLAY_ARG=$USER_DISPLAY
+fi
 
 echo -e "\n${BLUE}正在启动防掉线脚本 (使用 DISPLAY=$DISPLAY_ARG)...${NC}"
 echo -e "提示：按 ${RED}Ctrl+C${NC} 可以随时停止脚本。\n"
 
 # 启动 Python 脚本
 python rustdesk_pubg_afk.py --display $DISPLAY_ARG
+
+# 如果是我们启动的 Xvfb，在脚本退出后清理它
+if [ -n "$XVFB_PID" ]; then
+    echo -e "\n${BLUE}正在清理 Xvfb 虚拟显示器...${NC}"
+    kill $XVFB_PID
+fi
 
 # 脚本退出后，退出虚拟环境
 deactivate
