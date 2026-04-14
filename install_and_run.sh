@@ -163,16 +163,21 @@ if [ -z "$DISPLAY" ] || [ -n "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; 
         fi
     
         if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
-            echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
-            # Linux 无头下 RustDesk 需要指定 --no-sandbox 否则可能会 Aborted 退出
-            # 也可能是因为缺失一些硬件加速依赖，我们关闭 sandbox 并指定软渲染
-            DISPLAY=:99 rustdesk --no-sandbox --connect "$RUSTDESK_ID" --password "$RUSTDESK_PWD" > /tmp/rustdesk_run.log 2>&1 &
-            sleep 5
-            if ! pgrep -f "rustdesk" > /dev/null 2>&1; then
-                echo -e "${RED}[警告] rustdesk 进程未检测到。可能是参数不兼容或程序启动失败。${NC}"
-                echo -e "详细错误日志可查看: /tmp/rustdesk_run.log"
-            fi
-        else
+        echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
+        
+        # 因为在纯无头环境下，部分版本的 RustDesk 如果没有事先启动后台守护进程，CLI 调用会卡在 GUI 初始化阶段。
+        # 先静默启动一次主程序，让它拉起守护进程
+        DISPLAY=:99 rustdesk --no-sandbox > /dev/null 2>&1 &
+        sleep 3
+        
+        # 再通过 CLI 下发连接指令
+        DISPLAY=:99 rustdesk --no-sandbox --connect "$RUSTDESK_ID" --password "$RUSTDESK_PWD" > /tmp/rustdesk_run.log 2>&1 &
+        sleep 5
+        if ! pgrep -f "rustdesk" > /dev/null 2>&1; then
+            echo -e "${RED}[警告] rustdesk 进程未检测到。可能是参数不兼容或程序启动失败。${NC}"
+            echo -e "详细错误日志可查看: /tmp/rustdesk_run.log"
+        fi
+    else
             echo -e "${YELLOW}[警告] 您未输入完整的 ID 或密码，稍后请手动在终端中输入 DISPLAY=:99 rustdesk 启动。${NC}"
         fi
     fi
