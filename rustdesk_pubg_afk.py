@@ -1,3 +1,15 @@
+import sys
+import os
+import argparse
+
+# 必须在导入任何可能初始化 GUI/X11 的库之前处理 DISPLAY 环境变量
+parser = argparse.ArgumentParser(description='RustDesk PUBG Anti-AFK Script (Linux CLI Mode)')
+parser.add_argument('--display', type=str, default=':0', help='指定 X11 DISPLAY 环境变量 (默认: :0)')
+args = parser.parse_args()
+
+# 强制将所有 GUI 操作绑定到指定的 Display
+os.environ['DISPLAY'] = args.display
+
 import subprocess
 import pyautogui
 import easyocr
@@ -5,17 +17,6 @@ import numpy as np
 import mss
 import random
 import time
-import os
-import sys
-import argparse
-
-# 接收 CLI 命令行参数
-parser = argparse.ArgumentParser(description='RustDesk PUBG Anti-AFK Script (Linux CLI Mode)')
-parser.add_argument('--display', type=str, default=':0', help='指定 X11 DISPLAY 环境变量 (默认: :0)')
-args = parser.parse_args()
-
-# 强制将所有 GUI 操作绑定到指定的 Display
-os.environ['DISPLAY'] = args.display
 
 # 初始化 OCR 引擎
 print("正在加载 OCR 模型（默认使用 CPU）...")
