@@ -36,20 +36,27 @@
    ```
 
 ### Linux (RustDesk 远控版 - 纯 CLI 模式兼容)
-1. 确保您的系统为 X11 / Xorg 环境。若您在 SSH 或纯终端下运行，脚本已自动适配环境变量。
-2. 安装系统依赖（如 `xdotool` 用于窗口焦点控制）：
-   ```bash
-   sudo apt-get install xdotool python3-tk python3-dev
-   ```
-3. 克隆并进入目录：
+
+我们为您提供了一个一键安装与运行脚本，该脚本会自动处理所有系统级依赖（xdotool 等）、创建 Python 虚拟环境、配置加速源安装库并交互式启动：
+
+1. 克隆并进入目录：
    ```bash
    git clone https://github.com/yourusername/uu-pubg-afk.git
    cd uu-pubg-afk
    ```
-4. 安装 Python 依赖：
+2. 赋予脚本执行权限并运行：
    ```bash
-   pip3 install -r requirements.txt
+   chmod +x install_and_run.sh
+   ./install_and_run.sh
    ```
+3. 按照终端提示，按下回车键（默认 `:0` 号显示器）或输入您的实际 DISPLAY 环境变量即可运行。
+
+> *如果您希望手动安装，可以参考下方的老版本安装方式：*
+> ```bash
+> sudo apt-get install xdotool python3-tk python3-dev
+> pip3 install -r requirements.txt
+> python3 rustdesk_pubg_afk.py --display :0
+> ```
 
 ## 🚀 使用指南
 
@@ -60,11 +67,11 @@
      ```bash
      python uu_pubg_afk.py
      ```
-   - **Linux (RustDesk)**：通过终端或 SSH 运行：
+   - **Linux (RustDesk)**：通过一键脚本运行：
      ```bash
-     python3 rustdesk_pubg_afk.py
+     ./install_and_run.sh
      ```
-     *(如果您是通过 SSH 运行，且桌面的 DISPLAY 并非默认的 `:0`，您可以使用参数指定：`python3 rustdesk_pubg_afk.py --display :1`)*
+     *(如果您是通过 SSH 运行，且桌面的 DISPLAY 并非默认的 `:0`，请在运行后的提示中输入：`:1`)*
 4. **停止运行**：在终端中按下 `Ctrl + C` 即可安全停止脚本。
 
 ## ⚠️ 注意事项
