@@ -47,8 +47,35 @@ else
     echo "系统依赖已全部安装！"
 fi
 
+# 2.5 检查并安装 RustDesk 客户端
+echo -e "\n${GREEN}[2/5] 检查 RustDesk 客户端...${NC}"
+if ! command -v rustdesk >/dev/null 2>&1; then
+    echo -e "${YELLOW}未检测到 RustDesk 客户端，正在为您自动下载并安装...${NC}"
+    # 获取最新的 RustDesk deb 下载链接 (这里使用 GitHub API 或固定版本)
+    # 为了稳定，这里使用 1.2.3 稳定版作为 fallback
+    RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb"
+    
+    echo "正在下载 RustDesk: $RUSTDESK_DEB_URL"
+    wget -qO /tmp/rustdesk.deb "$RUSTDESK_DEB_URL"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}[错误] RustDesk 下载失败，请检查网络或稍后手动安装。${NC}"
+        exit 1
+    fi
+    
+    echo "正在安装 RustDesk..."
+    sudo apt-get install -y /tmp/rustdesk.deb
+    if [ $? -ne 0 ]; then
+         echo -e "${RED}[错误] RustDesk 安装失败。${NC}"
+         exit 1
+    fi
+    rm /tmp/rustdesk.deb
+    echo "RustDesk 安装完成！"
+else
+    echo "RustDesk 已安装！"
+fi
+
 # 3. 检查代码仓库是否完整
-echo -e "\n${GREEN}[2/4] 检查 Python 脚本文件...${NC}"
+echo -e "\n${GREEN}[3/5] 检查 Python 脚本文件...${NC}"
 if [ ! -f "rustdesk_pubg_afk.py" ] || [ ! -f "requirements.txt" ]; then
     echo -e "${RED}[错误] 找不到 rustdesk_pubg_afk.py 或 requirements.txt！${NC}"
     echo "请确保您已经 git clone 了本仓库，并在仓库根目录下执行此脚本。"
@@ -57,7 +84,7 @@ fi
 echo "脚本文件检查通过！"
 
 # 4. 配置 Python 虚拟环境并安装依赖
-echo -e "\n${GREEN}[3/4] 配置 Python 虚拟环境与依赖库...${NC}"
+echo -e "\n${GREEN}[4/5] 配置 Python 虚拟环境与依赖库...${NC}"
 VENV_DIR="venv"
 
 if [ ! -d "$VENV_DIR" ]; then
@@ -79,8 +106,8 @@ if [ $? -ne 0 ]; then
 fi
 echo "Python 依赖安装完成！"
 
-# 5. 启动配置
-echo -e "\n${GREEN}[4/4] 准备启动脚本...${NC}"
+# 5. 交互式启动配置
+echo -e "\n${GREEN}[5/5] 准备启动脚本...${NC}"
 echo -e "${YELLOW}请确认您的系统环境：${NC}"
 echo "将自动检测是否存在可用的 X11 桌面："
 echo "- 若存在 DISPLAY 且对应 X socket 可用：直接使用现有桌面"
