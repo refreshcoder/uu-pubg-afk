@@ -58,6 +58,12 @@
    - **自动启动 RustDesk 客户端并传入参数连接到您的游戏机**
    - *随后您只需用本地电脑上的 VNC Viewer 连入服务器 IP 的 `5900` 端口确认画面，然后在 SSH 终端回车让脚本接管即可。真正的一键无头挂机！*
 
+### 独立连接检测工具 (可选)
+为了方便排查 RustDesk 在无头环境的连接问题，项目中提供了一个独立的检测工具 `rustdesk_connect_check.sh`。它能拉起 RustDesk 并分析窗口状态和底层报错，给出友好的失败原因（如密码错误、P2P穿透失败等）：
+```bash
+./rustdesk_connect_check.sh <您的远控ID> <您的密码> :99
+```
+
 > *如果您希望手动安装，可以参考下方的老版本安装方式：*
 > ```bash
 > sudo apt-get install xdotool python3-tk python3-dev
