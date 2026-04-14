@@ -9,16 +9,86 @@ import random
 import time
 
 # 初始化 OCR 引擎 (首次运行会自动下载模型，请耐心等待)
-print("正在加载 OCR 模型...")
-reader = easyocr.Reader(['ch_sim', 'en'])
-print("OCR 模型加载完成！")
+print("正在加载 OCR 模型（默认使用 CPU）...")
+reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
+print("OCR 模型加载完成！当前模式：CPU OCR")
 
-user32 = ctypes.windll.user32
+user32 = ctypes.WinDLL("user32", use_last_error=True)
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 OCR_INTERVAL_SECONDS = 10 * 60
+SW_RESTORE = 9
+SW_SHOW = 5
+SW_MINIMIZE = 6
+SWP_NOMOVE = 0x0002
+SWP_NOSIZE = 0x0001
+SWP_SHOWWINDOW = 0x0040
+HWND_TOPMOST = ctypes.c_void_p(-1)
+HWND_NOTOPMOST = ctypes.c_void_p(-2)
+FOREGROUND_RETRY_DELAY_SECONDS = 0.2
+FOREGROUND_RETRY_COUNT = 3
 
 class POINT(ctypes.Structure):
     _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+def get_window_handle(win):
+    """从 pygetwindow 窗口对象中提取底层 HWND。"""
+    hwnd = getattr(win, "_hWnd", None)
+    if hwnd is None:
+        hwnd = getattr(win, "hWnd", None)
+    return int(hwnd) if hwnd else None
+
+def is_window_foreground(hwnd):
+    """用原生 Win32 前台窗口句柄校验是否真正切到前台。"""
+    if not hwnd:
+        return False
+    return user32.GetForegroundWindow() == hwnd
+
+def wait_for_foreground(hwnd, retries=FOREGROUND_RETRY_COUNT, delay=FOREGROUND_RETRY_DELAY_SECONDS):
+    """给窗口切前台留一个极短的异步生效时间。"""
+    for _ in range(max(1, retries)):
+        if is_window_foreground(hwnd):
+            return True
+        time.sleep(delay)
+    return is_window_foreground(hwnd)
+
+def force_window_foreground(hwnd):
+    """
+    通过 Win32 API 强制把窗口切到前台。
+    pygetwindow.activate() 偶尔会抛出错误码 0 的假失败，这里做回退。
+    """
+    if not hwnd or not user32.IsWindow(hwnd):
+        return False
+
+    if user32.IsIconic(hwnd):
+        user32.ShowWindow(hwnd, SW_RESTORE)
+        time.sleep(0.2)
+    else:
+        user32.ShowWindow(hwnd, SW_SHOW)
+
+    current_foreground = user32.GetForegroundWindow()
+    current_thread_id = kernel32.GetCurrentThreadId()
+    foreground_thread_id = user32.GetWindowThreadProcessId(current_foreground, None) if current_foreground else 0
+    target_thread_id = user32.GetWindowThreadProcessId(hwnd, None)
+    attached_thread_ids = []
+
+    try:
+        for thread_id in (foreground_thread_id, target_thread_id):
+            if thread_id and thread_id != current_thread_id and thread_id not in attached_thread_ids:
+                if user32.AttachThreadInput(current_thread_id, thread_id, True):
+                    attached_thread_ids.append(thread_id)
+
+        user32.BringWindowToTop(hwnd)
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+        user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+        user32.SetForegroundWindow(hwnd)
+        user32.SetFocus(hwnd)
+        user32.SetActiveWindow(hwnd)
+    finally:
+        for thread_id in reversed(attached_thread_ids):
+            user32.AttachThreadInput(current_thread_id, thread_id, False)
+
+    return wait_for_foreground(hwnd)
 
 def get_remote_window():
     """
@@ -38,25 +108,43 @@ def get_remote_window():
 
 def focus_window(win):
     """安全地将窗口恢复、置顶并激活。"""
-    try:
-        if win.isMinimized:
-            win.restore()
-            time.sleep(0.5)
-        if not win.isActive:
-            win.activate()
-        time.sleep(0.5)
-        return win.isActive
-    except Exception as e:
-        print(f"激活窗口失败: {e}")
+    hwnd = get_window_handle(win)
+    if not hwnd:
+        print("激活窗口失败: 未能获取目标窗口句柄。")
         return False
+
+    try:
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, SW_RESTORE)
+            time.sleep(0.5)
+
+        if wait_for_foreground(hwnd, retries=1, delay=0):
+            return True
+
+        try:
+            win.activate()
+        except Exception as e:
+            # pygetwindow 在 Windows 上偶发抛出“Error code 0”，但窗口可能已恢复。
+            print(f"pygetwindow 激活报错，尝试 Win32 回退激活: {e}")
+
+        if wait_for_foreground(hwnd):
+            return True
+
+        return force_window_foreground(hwnd)
+    except Exception as e:
+        if is_window_foreground(hwnd):
+            return True
+        print(f"激活窗口失败: {e}")
+        return force_window_foreground(hwnd)
 
 def minimize_window(win):
     """在本轮结束后将目标窗口重新最小化。"""
     if not win:
         return
     try:
-        if not win.isMinimized:
-            win.minimize()
+        hwnd = get_window_handle(win)
+        if hwnd and user32.IsWindow(hwnd) and not user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, SW_MINIMIZE)
             time.sleep(0.3)
     except Exception as e:
         print(f"最小化窗口失败: {e}")
@@ -104,11 +192,8 @@ def restore_desktop_state(state):
 
     if active_window:
         try:
-            if active_window.isMinimized:
-                active_window.restore()
-            if not active_window.isActive:
-                active_window.activate()
-            time.sleep(0.5)
+            if not focus_window(active_window):
+                print("恢复原焦点窗口失败: 未能将原窗口重新切到前台。")
         except Exception as e:
             print(f"恢复原焦点窗口失败: {e}")
 

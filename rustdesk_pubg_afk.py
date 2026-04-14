@@ -18,9 +18,9 @@ args = parser.parse_args()
 os.environ['DISPLAY'] = args.display
 
 # 初始化 OCR 引擎
-print("正在加载 OCR 模型...")
-reader = easyocr.Reader(['ch_sim', 'en'])
-print("OCR 模型加载完成！")
+print("正在加载 OCR 模型（默认使用 CPU）...")
+reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
+print("OCR 模型加载完成！当前模式：CPU OCR")
 
 OCR_INTERVAL_SECONDS = 10 * 60
 
