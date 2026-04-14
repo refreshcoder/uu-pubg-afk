@@ -32,7 +32,7 @@ def get_remote_window():
         if getattr(win, "isMinimized", False):
             minimized_candidate = minimized_candidate or win
             continue
-        if win.width > 800 and win.height > 600:
+        if win.width > 100 and win.height > 100:
             return win
     return minimized_candidate
 
