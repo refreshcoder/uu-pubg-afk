@@ -21,10 +21,11 @@ if [ "$EUID" -ne 0 ]; then
   echo -e "${YELLOW}[提示] 您当前不是 root 用户。如果系统缺少依赖，后续步骤可能会提示您输入 sudo 密码。${NC}"
 fi
 
-# 2. 检查并安装系统级依赖 (xdotool, xvfb, python3, pip, python3-tk)
+# 2. 检查并安装系统级依赖
 echo -e "\n${GREEN}[1/4] 检查系统依赖...${NC}"
 
-REQUIRED_PKGS="xdotool xvfb python3 python3-pip python3-tk python3-dev python3-venv"
+# 新增了 fluxbox (轻量级桌面) 和 x11vnc (VNC服务端)，大幅降低无头服务器使用门槛
+REQUIRED_PKGS="xdotool xvfb fluxbox x11vnc python3 python3-pip python3-tk python3-dev python3-venv"
 MISSING_PKGS=""
 
 for pkg in $REQUIRED_PKGS; do
@@ -35,7 +36,7 @@ done
 
 if [ -n "$MISSING_PKGS" ]; then
     echo -e "${YELLOW}发现缺失依赖: $MISSING_PKGS${NC}"
-    echo "正在使用 apt-get 安装..."
+    echo "正在使用 apt-get 安装 (由于包含桌面组件，可能需要几分钟)..."
     sudo apt-get update
     sudo apt-get install -y $MISSING_PKGS
     if [ $? -ne 0 ]; then
@@ -81,24 +82,57 @@ echo "Python 依赖安装完成！"
 # 5. 交互式启动配置
 echo -e "\n${GREEN}[4/4] 准备启动脚本...${NC}"
 echo -e "${YELLOW}请确认您的系统环境：${NC}"
-echo "1. 如果您在拥有桌面环境的 Linux 中运行，并且希望直接控制当前桌面，请输入对应的 DISPLAY 编号（通常为 :0 或 :1）。"
-echo "2. 如果您在纯命令行/无桌面的服务器（如云主机）中运行，请输入 'xvfb'，我们将为您在后台创建一个虚拟显示器。"
+echo "1. 拥有真实桌面环境 (GUI): 请直接回车（默认 :0）。"
+echo "2. 纯命令行服务器 (无头/SSH): 请输入 'xvfb'，我们将为您全自动配置虚拟桌面+远程访问。"
 
 read -p "请输入 DISPLAY 编号或输入 'xvfb' (默认 :0): " USER_DISPLAY
 USER_DISPLAY=${USER_DISPLAY:-":0"}
 
 if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
-    echo -e "\n${BLUE}正在启动 Xvfb 虚拟显示器 (:99)...${NC}"
-    # 检查是否已有 Xvfb 在运行
+    echo -e "\n${BLUE}================ 无头服务器保姆级模式 =================${NC}"
+    echo -e "${GREEN}正在为您在后台启动 Xvfb 虚拟显示器 (:99)...${NC}"
+    
+    # 启动 Xvfb
     if pgrep -x "Xvfb" > /dev/null; then
         echo -e "${YELLOW}[提示] Xvfb 已经在运行。${NC}"
     else
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         XVFB_PID=$!
         sleep 2
-        echo "Xvfb 启动成功 (PID: $XVFB_PID)"
     fi
     DISPLAY_ARG=":99"
+    export DISPLAY=":99"
+    
+    # 启动轻量级窗口管理器 (Fluxbox)，这样 RustDesk 的窗口才有标题栏和边框可以移动/最大化
+    if pgrep -x "fluxbox" > /dev/null; then
+        echo -e "${YELLOW}[提示] Fluxbox 窗口管理器已经在运行。${NC}"
+    else
+        echo "启动 Fluxbox 窗口管理器..."
+        fluxbox > /dev/null 2>&1 &
+        FLUXBOX_PID=$!
+        sleep 1
+    fi
+    
+    # 启动 x11vnc 提供远程连接
+    if pgrep -x "x11vnc" > /dev/null; then
+         echo -e "${YELLOW}[提示] x11vnc 已经在运行。${NC}"
+    else
+         echo "启动 x11vnc 远程桌面服务 (无密码，端口 5900)..."
+         x11vnc -display :99 -forever -shared -bg -nopw -quiet
+    fi
+    
+    # 获取本机IP以供提示
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+    
+    echo -e "\n${GREEN}★★★ 虚拟桌面环境已就绪！★★★${NC}"
+    echo -e "1. 请在您的本地电脑上下载并打开 VNC Viewer (如 RealVNC, TightVNC)。"
+    echo -e "2. 连接地址输入: ${YELLOW}${SERVER_IP}:5900${NC}"
+    echo -e "3. 连接成功后，您将看到一个黑色的虚拟桌面。"
+    echo -e "4. 请在这个虚拟桌面中打开终端，输入 ${YELLOW}rustdesk${NC} 来启动您的被控端客户端并连接游戏主机。"
+    echo -e "5. 最后，您可以随时缩小 VNC 窗口，本脚本将在后台自动接管操作！"
+    echo -e "${BLUE}=======================================================${NC}\n"
+    
+    read -p "如果您已经通过 VNC 打开了 RustDesk 并连接成功，请按回车键开始防掉线挂机..." DUMMY
 else
     DISPLAY_ARG=$USER_DISPLAY
 fi
@@ -109,10 +143,18 @@ echo -e "提示：按 ${RED}Ctrl+C${NC} 可以随时停止脚本。\n"
 # 启动 Python 脚本
 python rustdesk_pubg_afk.py --display $DISPLAY_ARG
 
-# 如果是我们启动的 Xvfb，在脚本退出后清理它
+# 如果是我们启动的 Xvfb 组件，在脚本退出后提示是否清理
 if [ -n "$XVFB_PID" ]; then
-    echo -e "\n${BLUE}正在清理 Xvfb 虚拟显示器...${NC}"
-    kill $XVFB_PID
+    echo -e "\n${YELLOW}脚本已停止。是否需要清理刚才创建的虚拟桌面(Xvfb/VNC)？(y/n)${NC}"
+    read -p "" CLEANUP_ANS
+    if [ "$CLEANUP_ANS" == "y" ] || [ "$CLEANUP_ANS" == "Y" ]; then
+        echo -e "${BLUE}正在清理虚拟桌面进程...${NC}"
+        kill $XVFB_PID 2>/dev/null
+        killall x11vnc 2>/dev/null
+        killall fluxbox 2>/dev/null
+    else
+        echo -e "${GREEN}虚拟桌面将继续在后台运行，您可以稍后再次执行脚本。${NC}"
+    fi
 fi
 
 # 脚本退出后，退出虚拟环境
