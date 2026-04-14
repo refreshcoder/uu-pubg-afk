@@ -236,7 +236,7 @@ def main():
                     f"鼠标位置: {desktop_state['cursor_pos']}"
                 )
 
-            wait_time = random.randint(45, 90)
+            wait_time = random.randint(120, 180)
             print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
             time.sleep(wait_time)
 
