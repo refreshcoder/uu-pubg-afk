@@ -1,6 +1,12 @@
-# Remote PUBG Anti-AFK (PUBG 防掉线助手)
+# UU / RustDesk PUBG Anti-AFK (绝地求生 远程防掉线助手)
 
-这是一个专为远程控制软件设计的 PUBG (绝地求生) 防掉线/防踢出自动化脚本。由于脚本运行在**主控机**而非游戏运行的被控机上，它通过物理级别的图像识别和系统级键鼠模拟来工作，最大限度保证了账号的安全（无游戏内存修改，不触碰反作弊系统）。
+这是一个专为“UU远程”和“RustDesk”等远程控制软件设计的 PUBG (绝地求生) 防掉线/防踢出自动化脚本。
+
+由于脚本运行在**主控机**（您正在使用的电脑）而非游戏运行的被控机上，它通过物理级别的图像识别和系统级键鼠模拟来工作，最大限度保证了账号的安全（无游戏内存修改，不触碰反作弊系统）。
+
+该项目目前包含两套脚本：
+- `uu_pubg_afk.py`：针对 **Windows** 环境下使用 **UU远程** 的场景。
+- `rustdesk_pubg_afk.py`：针对 **Linux** 环境下使用 **RustDesk** 的场景。
 
 ## ✨ 核心特性
 
@@ -12,34 +18,52 @@
 
 ## 🛠️ 安装说明
 
+### Windows (UU 远程版)
 1. 确保您的电脑（主控机）已安装 [Python 3.8+](https://www.python.org/downloads/)。
 2. 克隆本仓库或下载源码到本地：
    ```bash
    git clone https://github.com/yourusername/uu-pubg-afk.git
    cd uu-pubg-afk
    ```
-3. (推荐) 创建并激活虚拟环境：
+3. 创建并激活虚拟环境：
    ```bash
    python -m venv venv
-   # Windows:
    venv\Scripts\activate
-   # macOS/Linux:
-   source venv/bin/activate
    ```
 4. 安装相关依赖包：
    ```bash
    pip install -r requirements.txt
    ```
-   > *注：首次运行脚本时，`easyocr` 会自动下载所需的语言识别模型，请保持网络通畅。*
+
+### Linux (RustDesk 远控版)
+1. 确保您的系统为 X11 / Xorg 环境 (Wayland由于安全限制可能无法正常使用鼠标模拟)。
+2. 安装系统依赖（如 `xdotool` 和 `scrot` 用于窗口控制和截图）：
+   ```bash
+   sudo apt-get install xdotool scrot python3-tk python3-dev
+   ```
+3. 克隆并进入目录：
+   ```bash
+   git clone https://github.com/yourusername/uu-pubg-afk.git
+   cd uu-pubg-afk
+   ```
+4. 安装 Python 依赖：
+   ```bash
+   pip3 install -r requirements.txt
+   ```
 
 ## 🚀 使用指南
 
 1. **准备工作**：在被控机（游戏机）打开 PUBG，建议让角色在安全区域**面壁站立**（这样可以利用游戏内的物理碰撞体积进一步防止位移误差）。
-2. **连接远程**：在主控机打开远程控制软件并连接到被控机，确保能看到游戏画面。可以窗口化也可以全屏。
-3. **运行脚本**：在主控机上以**管理员身份**运行命令提示符或 PowerShell，执行以下命令：
-   ```bash
-   python uu_pubg_afk.py
-   ```
+2. **连接远程**：在主控机打开远程软件（UU远程 或 RustDesk）并连接到被控机，确保能看到游戏画面。
+3. **运行脚本**：
+   - **Windows (UU远程)**：以管理员身份打开终端运行：
+     ```bash
+     python uu_pubg_afk.py
+     ```
+   - **Linux (RustDesk)**：打开终端运行：
+     ```bash
+     python3 rustdesk_pubg_afk.py
+     ```
 4. **停止运行**：在终端中按下 `Ctrl + C` 即可安全停止脚本。
 
 ## ⚠️ 注意事项

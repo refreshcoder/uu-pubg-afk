@@ -1,0 +1,192 @@
+import subprocess
+import pyautogui
+import easyocr
+import numpy as np
+from PIL import ImageGrab
+import random
+import time
+import os
+import sys
+
+# 初始化 OCR 引擎 (首次运行会自动下载模型)
+print("正在加载 OCR 模型...")
+reader = easyocr.Reader(['ch_sim', 'en'])
+print("OCR 模型加载完成！")
+
+OCR_INTERVAL_SECONDS = 10 * 60
+
+def is_x11():
+    """检查是否为 X11 环境，Wayland 环境下 pyautogui 可能无法正常工作。"""
+    session_type = os.environ.get('XDG_SESSION_TYPE', '').lower()
+    return session_type == 'x11'
+
+def get_rustdesk_window():
+    """
+    通过 xdotool 查找 RustDesk 远程控制窗口
+    """
+    try:
+        # 查找包含 RustDesk 关键字的窗口
+        output = subprocess.check_output(['xdotool', 'search', '--name', 'RustDesk'], text=True)
+        win_ids = output.strip().split('\n')
+        
+        for win_id in win_ids:
+            if not win_id: continue
+            # 获取窗口几何信息
+            geom_output = subprocess.check_output(['xdotool', 'getwindowgeometry', win_id], text=True)
+            # 解析几何信息
+            # Example output:
+            # Window 10485764
+            #   Position: 10, 50 (screen: 0)
+            #   Geometry: 1280x720
+            lines = geom_output.split('\n')
+            pos_line = next(l for l in lines if 'Position:' in l)
+            geom_line = next(l for l in lines if 'Geometry:' in l)
+            
+            # 提取坐标和大小
+            pos_parts = pos_line.split(':')[1].split('(')[0].strip().split(',')
+            left, top = int(pos_parts[0].strip()), int(pos_parts[1].strip())
+            
+            size_parts = geom_line.split(':')[1].strip().split('x')
+            width, height = int(size_parts[0]), int(size_parts[1])
+            
+            # 过滤掉太小的窗口（例如主面板），保留远控大窗口
+            if width > 800 and height > 600:
+                return {
+                    'id': win_id,
+                    'left': left,
+                    'top': top,
+                    'width': width,
+                    'height': height
+                }
+    except subprocess.CalledProcessError:
+        pass
+    except Exception as e:
+        print(f"获取窗口信息时出错: {e}")
+        
+    return None
+
+def focus_window(win_info):
+    """通过 xdotool 激活窗口"""
+    try:
+        subprocess.check_call(['xdotool', 'windowactivate', '--sync', win_info['id']])
+        time.sleep(0.5)
+        return True
+    except subprocess.CalledProcessError:
+        print("激活窗口失败，请确保安装了 xdotool")
+        return False
+
+def check_kicked_with_ocr(win_info):
+    """
+    使用 OCR 检测窗口中心区域的异常文字
+    """
+    x1 = win_info['left'] + (win_info['width'] * 0.25)
+    y1 = win_info['top'] + (win_info['height'] * 0.25)
+    x2 = win_info['left'] + (win_info['width'] * 0.75)
+    y2 = win_info['top'] + (win_info['height'] * 0.75)
+    
+    bbox = (int(x1), int(y1), int(x2), int(y2))
+    
+    try:
+        screen = ImageGrab.grab(bbox=bbox)
+    except Exception as e:
+        print(f"截图失败 (可能是在 Wayland 环境): {e}")
+        return False
+        
+    img_np = np.array(screen)
+    results = reader.readtext(img_np, detail=1)
+    
+    keywords = ["错误", "錯誤", "Error", "error", "异常", "断开"]
+    
+    for bbox_coords, text, prob in results:
+        for key in keywords:
+            if key in text:
+                print(f"[{time.strftime('%H:%M:%S')}] 警告！检测到异常文字: '{text}' (置信度: {prob:.2f})")
+                
+                if "确定" in text or "确认" in text or "OK" in text:
+                    center_x = (bbox_coords[0][0] + bbox_coords[1][0]) / 2
+                    center_y = (bbox_coords[0][1] + bbox_coords[2][1]) / 2
+                    abs_click_x = int(x1 + center_x)
+                    abs_click_y = int(y1 + center_y)
+                    print(f"尝试自动点击 '确定' 按钮，坐标: ({abs_click_x}, {abs_click_y})")
+                    pyautogui.click(abs_click_x, abs_click_y)
+                    
+                return True
+    return False
+
+def should_run_ocr(last_ocr_time):
+    """控制 OCR 的执行频率"""
+    if last_ocr_time is None:
+        return True
+    return (time.time() - last_ocr_time) >= OCR_INTERVAL_SECONDS
+
+def safety_movement(win_info):
+    """执行极短防掉线动作 (原地踏步)"""
+    # 每次操作前确保窗口激活
+    if not focus_window(win_info):
+        return
+        
+    dx = random.randint(-60, 60)
+    dy = random.randint(-20, 20)
+    center_x = win_info['left'] + win_info['width'] // 2
+    center_y = win_info['top'] + win_info['height'] // 2
+    
+    # 使用 pyautogui 移动鼠标
+    pyautogui.moveTo(center_x + dx, center_y + dy, duration=0.2)
+    
+    keys = ['w', 's', 'a', 'd']
+    k = random.choice(keys)
+    hold_time = random.uniform(0.1, 0.18)
+    
+    pyautogui.keyDown(k)
+    time.sleep(hold_time)
+    pyautogui.keyUp(k)
+    
+    opp_map = {'w': 's', 's': 'w', 'a': 'd', 'd': 'a'}
+    time.sleep(0.05)
+    
+    pyautogui.keyDown(opp_map[k])
+    time.sleep(hold_time)
+    pyautogui.keyUp(opp_map[k])
+
+def main():
+    print("=== RustDesk PUBG 防掉线助手 (Linux) 已启动 ===")
+    if not is_x11():
+        print("警告: 检测到您可能正在使用 Wayland 桌面环境。")
+        print("由于 Wayland 的安全限制，pyautogui 和 xdotool 可能无法正常控制窗口和鼠标。")
+        print("建议在登录界面切换为 Xorg/X11 会话以获得最佳体验。")
+        
+    print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")
+    print("依赖检查: 请确保系统中已安装 xdotool 和 scrot (用于截图)。")
+    print("OCR 检测频率：每 10 分钟最多执行一次。")
+    
+    last_ocr_time = None
+    
+    try:
+        while True:
+            win_info = get_rustdesk_window()
+            if not win_info:
+                print(f"[{time.strftime('%H:%M:%S')}] 未找到符合条件的 RustDesk 窗口，请检查 RustDesk 是否已连接远控...")
+                time.sleep(10)
+                continue
+                
+            # 执行动作
+            safety_movement(win_info)
+            print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
+            
+            # 决定是否进行 OCR 检测
+            if should_run_ocr(last_ocr_time):
+                print(f"[{time.strftime('%H:%M:%S')}] 正在执行定期画面状态 OCR 检测...")
+                if check_kicked_with_ocr(win_info):
+                    print(f"[{time.strftime('%H:%M:%S')}] 状态：画面异常，暂停防掉线动作，等待人工处理...")
+                    time.sleep(30)
+                last_ocr_time = time.time()
+                
+            wait_time = random.randint(45, 90)
+            print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
+            time.sleep(wait_time)
+            
+    except KeyboardInterrupt:
+        print("\n=== 脚本已手动停止 ===")
+
+if __name__ == "__main__":
+    main()
