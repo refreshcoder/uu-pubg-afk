@@ -76,9 +76,13 @@ def get_rustdesk_window():
 
 def focus_window(win_info):
     """通过 xdotool 激活窗口"""
+    # 如果是纯无头 Xvfb 模式，通常全屏且只有一个应用在运行，不需要激活窗口，直接返回 True 提升性能
+    if os.environ.get('DISPLAY') == ':99':
+        return True
+        
     try:
         subprocess.check_call(['xdotool', 'windowactivate', '--sync', win_info['id']])
-        time.sleep(0.5)
+        time.sleep(0.1)
         return True
     except subprocess.CalledProcessError:
         print("激活窗口失败，请确保安装了 xdotool")
@@ -138,17 +142,23 @@ def should_run_ocr(last_ocr_time):
 
 def safety_movement(win_info):
     """执行极短防掉线动作 (原地踏步)"""
-    # 每次操作前确保窗口激活
+    # 每次操作前确保窗口激活 (Xvfb 无头模式会自动跳过)
     if not focus_window(win_info):
         return
         
+    # 如果是在无头环境 (:99)，RustDesk 通常会自动全屏，不需要考虑边界偏移，直接在中心操作
+    if os.environ.get('DISPLAY') == ':99':
+        center_x = 1920 // 2
+        center_y = 1080 // 2
+    else:
+        center_x = win_info['left'] + win_info['width'] // 2
+        center_y = win_info['top'] + win_info['height'] // 2
+        
     dx = random.randint(-60, 60)
     dy = random.randint(-20, 20)
-    center_x = win_info['left'] + win_info['width'] // 2
-    center_y = win_info['top'] + win_info['height'] // 2
     
     # 使用 pyautogui 移动鼠标
-    pyautogui.moveTo(center_x + dx, center_y + dy, duration=0.2)
+    pyautogui.moveTo(center_x + dx, center_y + dy, duration=0.1)
     
     keys = ['w', 's', 'a', 'd']
     k = random.choice(keys)

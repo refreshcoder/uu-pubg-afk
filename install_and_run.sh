@@ -24,8 +24,8 @@ fi
 # 2. 检查并安装系统级依赖
 echo -e "\n${GREEN}[1/4] 检查系统依赖...${NC}"
 
-# 新增了 fluxbox (轻量级桌面) 和 x11vnc (VNC服务端)，大幅降低无头服务器使用门槛
-REQUIRED_PKGS="xdotool xvfb fluxbox x11vnc python3 python3-pip python3-tk python3-dev python3-venv"
+# 精简依赖：去除了重量级的 fluxbox，仅保留 Xvfb 和 x11vnc 提供最基础的无头推流能力
+REQUIRED_PKGS="xdotool xvfb x11vnc python3 python3-pip python3-tk python3-dev python3-venv"
 MISSING_PKGS=""
 
 for pkg in $REQUIRED_PKGS; do
@@ -103,16 +103,6 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     DISPLAY_ARG=":99"
     export DISPLAY=":99"
     
-    # 启动轻量级窗口管理器 (Fluxbox)，这样 RustDesk 的窗口才有标题栏和边框可以移动/最大化
-    if pgrep -x "fluxbox" > /dev/null; then
-        echo -e "${YELLOW}[提示] Fluxbox 窗口管理器已经在运行。${NC}"
-    else
-        echo "启动 Fluxbox 窗口管理器..."
-        fluxbox > /dev/null 2>&1 &
-        FLUXBOX_PID=$!
-        sleep 1
-    fi
-    
     # 启动 x11vnc 提供远程连接
     if pgrep -x "x11vnc" > /dev/null; then
          echo -e "${YELLOW}[提示] x11vnc 已经在运行。${NC}"
@@ -124,15 +114,15 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     # 获取本机IP以供提示
     SERVER_IP=$(hostname -I | awk '{print $1}')
     
-    echo -e "\n${GREEN}★★★ 虚拟桌面环境已就绪！★★★${NC}"
-    echo -e "1. 请在您的本地电脑上下载并打开 VNC Viewer (如 RealVNC, TightVNC)。"
-    echo -e "2. 连接地址输入: ${YELLOW}${SERVER_IP}:5900${NC}"
-    echo -e "3. 连接成功后，您将看到一个黑色的虚拟桌面。"
-    echo -e "4. 请在这个虚拟桌面中打开终端，输入 ${YELLOW}rustdesk${NC} 来启动您的被控端客户端并连接游戏主机。"
-    echo -e "5. 最后，您可以随时缩小 VNC 窗口，本脚本将在后台自动接管操作！"
+    echo -e "\n${GREEN}★★★ 无头虚拟桌面环境已就绪！★★★${NC}"
+    echo -e "1. 请在您的本地电脑上使用 VNC Viewer 连接到: ${YELLOW}${SERVER_IP}:5900${NC}"
+    echo -e "2. 连接成功后，您将看到一个黑屏环境。"
+    echo -e "3. 请在这个终端中（不要断开 SSH），后台启动 RustDesk: ${YELLOW}DISPLAY=:99 rustdesk &${NC}"
+    echo -e "4. 此时您的 VNC 画面会显示出 RustDesk 全屏窗口，请进行连接操作。"
+    echo -e "5. 连接游戏并确认画面后，您就可以回到这个 SSH 终端按下回车键，脚本会接管自动操作！"
     echo -e "${BLUE}=======================================================${NC}\n"
     
-    read -p "如果您已经通过 VNC 打开了 RustDesk 并连接成功，请按回车键开始防掉线挂机..." DUMMY
+    read -p "如果您已经配置好 RustDesk 画面，请按回车键开始防掉线挂机..." DUMMY
 else
     DISPLAY_ARG=$USER_DISPLAY
 fi
@@ -151,7 +141,6 @@ if [ -n "$XVFB_PID" ]; then
         echo -e "${BLUE}正在清理虚拟桌面进程...${NC}"
         kill $XVFB_PID 2>/dev/null
         killall x11vnc 2>/dev/null
-        killall fluxbox 2>/dev/null
     else
         echo -e "${GREEN}虚拟桌面将继续在后台运行，您可以稍后再次执行脚本。${NC}"
     fi
