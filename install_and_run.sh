@@ -108,7 +108,20 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
          echo -e "${YELLOW}[提示] x11vnc 已经在运行。${NC}"
     else
          echo "启动 x11vnc 远程桌面服务 (无密码，端口 5900)..."
-         x11vnc -display :99 -forever -shared -bg -nopw -quiet
+         x11vnc -display :99 -forever -shared -bg -nopw -quiet &
+    fi
+    
+    # 交互获取 RustDesk 连接参数
+    echo -e "\n${YELLOW}为方便一键挂机，请输入被控端 (游戏主机) 的 RustDesk 信息：${NC}"
+    read -p "被控端 ID (如 123456789): " RUSTDESK_ID
+    read -p "被控端 密码 (如 password): " RUSTDESK_PWD
+    
+    if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
+        echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
+        rustdesk --connect $RUSTDESK_ID --password $RUSTDESK_PWD > /dev/null 2>&1 &
+        sleep 5
+    else
+        echo -e "${YELLOW}[警告] 您未输入完整的 ID 或密码，稍后请手动在终端中输入 DISPLAY=:99 rustdesk 启动。${NC}"
     fi
     
     # 获取本机IP以供提示
@@ -116,10 +129,14 @@ if [ "$USER_DISPLAY" == "xvfb" ] || [ "$USER_DISPLAY" == "XVFB" ]; then
     
     echo -e "\n${GREEN}★★★ 无头虚拟桌面环境已就绪！★★★${NC}"
     echo -e "1. 请在您的本地电脑上使用 VNC Viewer 连接到: ${YELLOW}${SERVER_IP}:5900${NC}"
-    echo -e "2. 连接成功后，您将看到一个黑屏环境。"
-    echo -e "3. 请在这个终端中（不要断开 SSH），后台启动 RustDesk: ${YELLOW}DISPLAY=:99 rustdesk &${NC}"
-    echo -e "4. 此时您的 VNC 画面会显示出 RustDesk 全屏窗口，请进行连接操作。"
-    echo -e "5. 连接游戏并确认画面后，您就可以回到这个 SSH 终端按下回车键，脚本会接管自动操作！"
+    if [ -n "$RUSTDESK_ID" ]; then
+        echo -e "2. 如果您填写的连接参数无误，VNC 画面中应已显示游戏主机的全屏远控画面！"
+    else
+        echo -e "2. 连接成功后，您将看到一个黑屏环境。"
+        echo -e "3. 请在这个终端中（不要断开 SSH），后台启动 RustDesk: ${YELLOW}DISPLAY=:99 rustdesk &${NC}"
+        echo -e "4. 此时您的 VNC 画面会显示出 RustDesk 全屏窗口，请进行连接操作。"
+    fi
+    echo -e "5. 确认画面后，请回到这个 SSH 终端按下回车键，脚本会接管自动操作！"
     echo -e "${BLUE}=======================================================${NC}\n"
     
     read -p "如果您已经配置好 RustDesk 画面，请按回车键开始防掉线挂机..." DUMMY
