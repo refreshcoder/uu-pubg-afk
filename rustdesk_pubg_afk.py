@@ -78,6 +78,25 @@ def list_rustdesk_windows():
             continue
     return win_ids
 
+def get_display_geometry():
+    try:
+        out = subprocess.check_output(['xdotool', 'getdisplaygeometry'], text=True).strip()
+        parts = out.split()
+        if len(parts) >= 2:
+            return int(parts[0]), int(parts[1])
+    except Exception:
+        pass
+    return 1920, 1080
+
+def fullscreen_window(win_id):
+    if not win_id:
+        return False
+
+    width, height = get_display_geometry()
+    subprocess.run(['xdotool', 'windowmove', win_id, '0', '0'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    subprocess.run(['xdotool', 'windowsize', win_id, str(width), str(height)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    return True
+
 def restart_rustdesk():
     subprocess.run(['pkill', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
@@ -161,6 +180,7 @@ def get_rustdesk_window():
                 }
 
         if best and best['width'] > 300 and best['height'] > 300:
+            fullscreen_window(best['id'])
             return best
     except subprocess.CalledProcessError:
         pass
@@ -181,6 +201,7 @@ def focus_window(win_info):
     try:
         subprocess.check_call(['xdotool', 'windowactivate', '--sync', win_info['id']])
         time.sleep(0.1)
+        fullscreen_window(win_info['id'])
         return True
     except subprocess.CalledProcessError:
         print("激活窗口失败，请确保安装了 xdotool")
