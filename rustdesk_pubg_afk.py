@@ -89,6 +89,35 @@ def list_rustdesk_windows():
             continue
     return win_ids
 
+def get_window_name(win_id):
+    try:
+        return subprocess.check_output(['xdotool', 'getwindowname', win_id], text=True).strip()
+    except Exception:
+        return ''
+
+def get_window_geometry(win_id):
+    try:
+        geom_output = subprocess.check_output(['xdotool', 'getwindowgeometry', win_id], text=True)
+        lines = geom_output.split('\n')
+        pos_line = next(l for l in lines if 'Position:' in l)
+        geom_line = next(l for l in lines if 'Geometry:' in l)
+
+        pos_parts = pos_line.split(':')[1].split('(')[0].strip().split(',')
+        left, top = int(pos_parts[0].strip()), int(pos_parts[1].strip())
+
+        size_parts = geom_line.split(':')[1].strip().split('x')
+        width, height = int(size_parts[0]), int(size_parts[1])
+
+        return {
+            'id': win_id,
+            'left': left,
+            'top': top,
+            'width': width,
+            'height': height,
+        }
+    except Exception:
+        return None
+
 def get_display_geometry():
     try:
         out = subprocess.check_output(['xdotool', 'getdisplaygeometry'], text=True).strip()
@@ -107,6 +136,44 @@ def fullscreen_window(win_id):
     subprocess.run(['xdotool', 'windowmove', win_id, '0', '0'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     subprocess.run(['xdotool', 'windowsize', win_id, str(width), str(height)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     return True
+
+def select_remote_window(target_id, preferred_ids=None):
+    width, height = get_display_geometry()
+    display_area = width * height
+
+    target_id = (target_id or '').replace(' ', '').strip()
+    ids = set(preferred_ids or set())
+    ids |= list_rustdesk_windows()
+    if not ids:
+        return None
+
+    best = None
+    best_score = -1
+    for wid in ids:
+        geom = get_window_geometry(wid)
+        if not geom:
+            continue
+
+        area = geom['width'] * geom['height']
+        if area < 300 * 300:
+            continue
+
+        name = get_window_name(wid)
+        score = 0
+        if target_id and target_id in name.replace(' ', ''):
+            score += 1_000_000
+        if area >= int(display_area * 0.70):
+            score += area
+        elif score == 0:
+            continue
+
+        if score > best_score:
+            best_score = score
+            best = geom
+
+    if best and best.get('id'):
+        fullscreen_window(best['id'])
+    return best
 
 def restart_rustdesk():
     subprocess.run(['pkill', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -198,30 +265,15 @@ def get_rustdesk_window():
         best = None
         best_area = 0
         for win_id in win_ids:
-            geom_output = subprocess.check_output(['xdotool', 'getwindowgeometry', win_id], text=True)
-            lines = geom_output.split('\n')
-            pos_line = next(l for l in lines if 'Position:' in l)
-            geom_line = next(l for l in lines if 'Geometry:' in l)
-            
-            pos_parts = pos_line.split(':')[1].split('(')[0].strip().split(',')
-            left, top = int(pos_parts[0].strip()), int(pos_parts[1].strip())
-            
-            size_parts = geom_line.split(':')[1].strip().split('x')
-            width, height = int(size_parts[0]), int(size_parts[1])
-            
-            area = width * height
+            geom = get_window_geometry(win_id)
+            if not geom:
+                continue
+            area = geom['width'] * geom['height']
             if area > best_area:
                 best_area = area
-                best = {
-                    'id': win_id,
-                    'left': left,
-                    'top': top,
-                    'width': width,
-                    'height': height,
-                }
+                best = geom
 
         if best and best['width'] > 300 and best['height'] > 300:
-            fullscreen_window(best['id'])
             return best
     except subprocess.CalledProcessError:
         pass
@@ -323,8 +375,8 @@ def main():
 
             try:
                 win_info = None
-                for _ in range(10):
-                    win_info = get_rustdesk_window()
+                for _ in range(CONNECT_TIMEOUT_SECONDS):
+                    win_info = select_remote_window(args.target_id, preferred_ids=connected_win_ids)
                     if win_info:
                         break
                     time.sleep(1)
