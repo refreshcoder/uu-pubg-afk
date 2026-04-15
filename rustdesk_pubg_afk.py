@@ -318,7 +318,16 @@ def safety_movement(win_info):
     dy = random.randint(-20, 20)
     
     # 使用 pyautogui 移动鼠标
-    pyautogui.moveTo(center_x + dx, center_y + dy, duration=0.1)
+    move_duration = 0.1
+    pyautogui.moveTo(center_x + dx, center_y + dy, duration=move_duration)
+
+    pyautogui.mouseDown(button='right')
+    time.sleep(move_duration)
+    pyautogui.mouseUp(button='right')
+
+    pyautogui.click(button='right')
+    time.sleep(random.uniform(2, 4))
+    pyautogui.click(button='right')
     
     keys = ['w', 's', 'a', 'd']
     k = random.choice(keys)
@@ -386,7 +395,7 @@ def main():
                     time.sleep(10)
                     continue
 
-                time.sleep(5)
+                time.sleep(15)
 
                 safety_movement(win_info)
                 print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
@@ -395,7 +404,7 @@ def main():
                     connected_win_ids.add(win_info['id'])
                 disconnect_rustdesk(connected_win_ids)
 
-            wait_time = random.randint(580, 640)
+            wait_time = random.randint(280, 320)
             print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
             time.sleep(wait_time)
             
