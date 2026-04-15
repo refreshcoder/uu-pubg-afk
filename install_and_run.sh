@@ -77,8 +77,8 @@ fi
 
 # 3. 检查代码仓库是否完整
 echo -e "\n${GREEN}[3/5] 检查 Python 脚本文件...${NC}"
-if [ ! -f "rustdesk_pubg_afk.py" ] || [ ! -f "requirements.txt" ]; then
-    echo -e "${RED}[错误] 找不到 rustdesk_pubg_afk.py 或 requirements.txt！${NC}"
+if [ ! -f "rustdesk_pubg_afk.py" ] || [ ! -f "requirements_rustdesk.txt" ]; then
+    echo -e "${RED}[错误] 找不到 rustdesk_pubg_afk.py 或 requirements_rustdesk.txt！${NC}"
     echo "请确保您已经 git clone 了本仓库，并在仓库根目录下执行此脚本。"
     exit 1
 fi
@@ -96,10 +96,10 @@ fi
 # 激活虚拟环境
 source $VENV_DIR/bin/activate
 
-echo "正在安装 Python 依赖 (这可能需要几分钟，特别是下载 OCR 模型)..."
+echo "正在安装 Python 依赖..."
 # 使用清华源加速国内下载
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements_rustdesk.txt
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}[错误] Python 依赖安装失败！${NC}"
@@ -147,54 +147,21 @@ if [ -z "$DISPLAY" ] || [ -n "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; 
          x11vnc -display :99 -forever -shared -bg -nopw -quiet &
     fi
     
-    # 交互获取 RustDesk 连接参数
-    if ! command -v rustdesk > /dev/null 2>&1; then
-        echo -e "\n${YELLOW}[警告] 未检测到 rustdesk 命令。请先在该服务器安装 RustDesk 客户端后再继续。${NC}"
-        echo -e "${YELLOW}当前仍会启动挂机脚本，但需要您自行确保 RustDesk 画面已存在于 :99。${NC}"
-    else
-        echo -e "\n${YELLOW}为方便一键挂机，请输入被控端 (游戏主机) 的 RustDesk 信息：${NC}"
-        if [ -z "$RUSTDESK_ID" ]; then
-            read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
-        fi
-        RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
-        if [ -z "$RUSTDESK_PWD" ]; then
-            read -r -s -p "被控端 密码: " RUSTDESK_PWD
-            echo
-        fi
-    
-        if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
-        echo -e "${BLUE}正在后台拉起 RustDesk 并自动连接到 $RUSTDESK_ID...${NC}"
-        
-        # 因为在纯无头环境下，部分版本的 RustDesk 如果没有事先启动后台守护进程，CLI 调用会卡在 GUI 初始化阶段。
-        # 先静默启动一次主程序，让它拉起守护进程
-        DISPLAY=:99 rustdesk --no-sandbox > /dev/null 2>&1 &
-        sleep 3
-        
-        # 再通过 CLI 下发连接指令
-        DISPLAY=:99 rustdesk --no-sandbox --connect "$RUSTDESK_ID" --password "$RUSTDESK_PWD" > /tmp/rustdesk_run.log 2>&1 &
-        sleep 5
-        if ! pgrep -f "rustdesk" > /dev/null 2>&1; then
-            echo -e "${RED}[警告] rustdesk 进程未检测到。可能是参数不兼容或程序启动失败。${NC}"
-            echo -e "详细错误日志可查看: /tmp/rustdesk_run.log"
-        fi
-    else
-            echo -e "${YELLOW}[警告] 您未输入完整的 ID 或密码，稍后请手动在终端中输入 DISPLAY=:99 rustdesk 启动。${NC}"
-        fi
-    fi
+    echo -e "\n${YELLOW}请输入被控端 (游戏主机) 的 RustDesk 信息（脚本每轮会自动连接并在结束后断开）：${NC}"
+    read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
+    RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
+    read -r -s -p "被控端 密码: " RUSTDESK_PWD
+    echo
+
+    read -r -p "额外 rustdesk 参数(可选，直接回车跳过): " RUSTDESK_EXTRA_ARGS
     
     # 获取本机IP以供提示
     SERVER_IP=$(hostname -I | awk '{print $1}')
     
     echo -e "\n${GREEN}★★★ 无头虚拟桌面环境已就绪！★★★${NC}"
     echo -e "1. 请在您的本地电脑上使用 VNC Viewer 连接到: ${YELLOW}${SERVER_IP}:5900${NC}"
-    if [ -n "$RUSTDESK_ID" ]; then
-        echo -e "2. 如果您填写的连接参数无误，VNC 画面中应已显示游戏主机的全屏远控画面！"
-    else
-        echo -e "2. 连接成功后，您将看到一个黑屏环境。"
-        echo -e "3. 请在这个终端中（不要断开 SSH），后台启动 RustDesk: ${YELLOW}DISPLAY=:99 rustdesk &${NC}"
-        echo -e "4. 此时您的 VNC 画面会显示出 RustDesk 全屏窗口，请进行连接操作。"
-    fi
-    echo -e "5. 确认画面后，请回到这个 SSH 终端按下回车键，脚本会接管自动操作！"
+    echo -e "2. 首次连接如遇到安全验证页面，请在 VNC 内完成一次验证。"
+    echo -e "3. 完成后回到 SSH 终端按回车启动防掉线脚本。"
     echo -e "${BLUE}=======================================================${NC}\n"
     
     read -p "如果您已经配置好 RustDesk 画面，请按回车键开始防掉线挂机..." DUMMY
@@ -206,7 +173,11 @@ echo -e "\n${BLUE}正在启动防掉线脚本 (使用 DISPLAY=$DISPLAY_ARG)...${
 echo -e "提示：按 ${RED}Ctrl+C${NC} 可以随时停止脚本。\n"
 
 # 启动 Python 脚本
-python rustdesk_pubg_afk.py --display $DISPLAY_ARG
+if [ -n "$RUSTDESK_ID" ] && [ -n "$RUSTDESK_PWD" ]; then
+    python rustdesk_pubg_afk.py --display "$DISPLAY_ARG" --target-id "$RUSTDESK_ID" --target-password "$RUSTDESK_PWD" --rustdesk-extra-args "$RUSTDESK_EXTRA_ARGS"
+else
+    python rustdesk_pubg_afk.py --display "$DISPLAY_ARG"
+fi
 
 # 如果是我们启动的 Xvfb 组件，在脚本退出后提示是否清理
 if [ -n "$XVFB_PID" ]; then

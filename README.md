@@ -67,7 +67,7 @@
 > *如果您希望手动安装，可以参考下方的老版本安装方式：*
 > ```bash
 > sudo apt-get install xdotool python3-tk python3-dev
-> pip3 install -r requirements.txt
+> pip3 install -r requirements_rustdesk.txt
 > python3 rustdesk_pubg_afk.py --display :0
 > ```
 
