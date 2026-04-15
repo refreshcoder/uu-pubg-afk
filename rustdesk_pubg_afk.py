@@ -30,22 +30,32 @@ import random
 import time
 
 pyautogui.FAILSAFE = False
+RUSTDESK_DAEMON_LOG = '/tmp/rustdesk_daemon.log'
+RUSTDESK_CONNECT_LOG = '/tmp/rustdesk_connect.log'
 
 def is_x11():
     """检查当前是否为 X11 运行环境"""
     return os.environ.get('DISPLAY') is not None
+
+def is_rustdesk_running():
+    return subprocess.run(['pgrep', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
 
 def ensure_rustdesk_running():
     if shutil.which('rustdesk') is None:
         print("未检测到 rustdesk 命令，无法自动连接。")
         return False
 
-    if subprocess.run(['pgrep', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+    if is_rustdesk_running():
         return True
 
     env = os.environ.copy()
-    subprocess.Popen(['rustdesk', '--no-sandbox'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(3)
+    with open(RUSTDESK_DAEMON_LOG, 'ab') as fp:
+        subprocess.Popen(['rustdesk', '--no-sandbox'], env=env, stdout=fp, stderr=fp)
+
+    for _ in range(8):
+        if is_rustdesk_running():
+            return True
+        time.sleep(1)
     return True
 
 def list_rustdesk_windows():
@@ -68,7 +78,15 @@ def list_rustdesk_windows():
             continue
     return win_ids
 
+def restart_rustdesk():
+    subprocess.run(['pkill', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1)
+    return ensure_rustdesk_running()
+
 def connect_rustdesk(target_id, target_password, extra_args):
+    target_id = (target_id or '').replace(' ', '').strip()
+    target_password = (target_password or '').strip()
+
     if not target_id or not target_password:
         return set()
 
@@ -81,8 +99,15 @@ def connect_rustdesk(target_id, target_password, extra_args):
     cmd = ['rustdesk', '--no-sandbox', '--connect', target_id, '--password', target_password]
     if extra_args:
         cmd.extend(shlex.split(extra_args))
-    subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(5)
+    with open(RUSTDESK_CONNECT_LOG, 'ab') as fp:
+        subprocess.Popen(cmd, env=env, stdout=fp, stderr=fp)
+
+    for _ in range(15):
+        after = list_rustdesk_windows()
+        delta = after - before
+        if delta:
+            return delta
+        time.sleep(1)
 
     after = list_rustdesk_windows()
     return after - before
@@ -219,11 +244,18 @@ def main():
     print("依赖检查: 请确保系统中已安装 xdotool (用于窗口焦点控制)。")
     print("运行策略：RustDesk 常驻运行，每轮操作前建立连接，操作结束后断开连接。")
 
+    if not args.target_id or not args.target_password:
+        print("错误：缺少 RustDesk 被控端信息。请使用参数 --target-id 和 --target-password。")
+        sys.exit(2)
+
     ensure_rustdesk_running()
     
     try:
         while True:
             connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
+            if not connected_win_ids:
+                restart_rustdesk()
+                connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
 
             try:
                 win_info = None
