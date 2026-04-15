@@ -264,6 +264,15 @@ def safety_movement(win):
     time.sleep(hold_time)
     pydirectinput.keyUp(opp_map[k])
 
+    extra_times = random.randint(2, 5)
+    for _ in range(extra_times):
+        key = random.choice(['q', 'e'])
+        press_time = random.uniform(0.03, 0.07)
+        pydirectinput.keyDown(key)
+        time.sleep(press_time)
+        pydirectinput.keyUp(key)
+        time.sleep(random.uniform(0.05, 0.15))
+
 def main():
     print("=== UU远程 PUBG 防掉线助手已启动 ===")
     print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")

@@ -209,6 +209,15 @@ def safety_movement(win_info):
     time.sleep(hold_time)
     pyautogui.keyUp(opp_map[k])
 
+    extra_times = random.randint(2, 5)
+    for _ in range(extra_times):
+        key = random.choice(['q', 'e'])
+        press_time = random.uniform(0.03, 0.07)
+        pyautogui.keyDown(key)
+        time.sleep(press_time)
+        pyautogui.keyUp(key)
+        time.sleep(random.uniform(0.05, 0.15))
+
 def main():
     print(f"=== RustDesk PUBG 防掉线助手 (Linux CLI 模式) 已启动 ===")
     print(f"当前绑定的 X11 Display: {os.environ.get('DISPLAY')}")
