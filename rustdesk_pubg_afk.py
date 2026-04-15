@@ -386,6 +386,8 @@ def main():
                     time.sleep(10)
                     continue
 
+                time.sleep(5)
+
                 safety_movement(win_info)
                 print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
             finally:
