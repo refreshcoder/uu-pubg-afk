@@ -28,17 +28,6 @@ import subprocess
 import random
 import time
 
-try:
-    import pyautogui
-except ModuleNotFoundError:
-    print("缺少依赖：pyautogui")
-    print("请在项目目录执行：")
-    print("1) python3 -m venv venv")
-    print("2) . venv/bin/activate")
-    print("3) pip install -r requirements_rustdesk.txt")
-    sys.exit(2)
-
-pyautogui.FAILSAFE = False
 RUSTDESK_DAEMON_LOG = '/tmp/rustdesk_daemon.log'
 RUSTDESK_CONNECT_LOG = '/tmp/rustdesk_connect.log'
 CONNECT_TIMEOUT_SECONDS = 30
@@ -47,6 +36,27 @@ CONNECT_RETRIES = 3
 def is_x11():
     """检查当前是否为 X11 运行环境"""
     return os.environ.get('DISPLAY') is not None
+
+def xdotool(*args):
+    return subprocess.run(['xdotool', *map(str, args)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def xdotool_key_down(key):
+    xdotool('keydown', key)
+
+def xdotool_key_up(key):
+    xdotool('keyup', key)
+
+def xdotool_mouse_move(x, y):
+    xdotool('mousemove', x, y)
+
+def xdotool_mouse_down(button):
+    xdotool('mousedown', button)
+
+def xdotool_mouse_up(button):
+    xdotool('mouseup', button)
+
+def xdotool_mouse_click(button):
+    xdotool('click', button)
 
 def is_rustdesk_running():
     return subprocess.run(['pgrep', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
@@ -317,40 +327,39 @@ def safety_movement(win_info):
     dx = random.randint(-60, 60)
     dy = random.randint(-20, 20)
     
-    # 使用 pyautogui 移动鼠标
     move_duration = 0.1
-    pyautogui.moveTo(center_x + dx, center_y + dy, duration=move_duration)
+    xdotool_mouse_move(center_x + dx, center_y + dy)
 
-    pyautogui.mouseDown(button='right')
+    xdotool_mouse_down(3)
     time.sleep(move_duration)
-    pyautogui.mouseUp(button='right')
+    xdotool_mouse_up(3)
 
-    pyautogui.click(button='right')
+    xdotool_mouse_click(3)
     time.sleep(random.uniform(2, 4))
-    pyautogui.click(button='right')
+    xdotool_mouse_click(3)
     
     keys = ['w', 's', 'a', 'd']
     k = random.choice(keys)
     hold_time = random.uniform(0.1, 0.18)
     
-    pyautogui.keyDown(k)
+    xdotool_key_down(k)
     time.sleep(hold_time)
-    pyautogui.keyUp(k)
+    xdotool_key_up(k)
     
     opp_map = {'w': 's', 's': 'w', 'a': 'd', 'd': 'a'}
     time.sleep(0.05)
     
-    pyautogui.keyDown(opp_map[k])
+    xdotool_key_down(opp_map[k])
     time.sleep(hold_time)
-    pyautogui.keyUp(opp_map[k])
+    xdotool_key_up(opp_map[k])
 
     extra_times = random.randint(2, 5)
     for _ in range(extra_times):
         key = random.choice(['q', 'e'])
         press_time = random.uniform(0.03, 0.07)
-        pyautogui.keyDown(key)
+        xdotool_key_down(key)
         time.sleep(press_time)
-        pyautogui.keyUp(key)
+        xdotool_key_up(key)
         time.sleep(random.uniform(0.05, 0.15))
 
 def main():
