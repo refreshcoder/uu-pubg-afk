@@ -35,91 +35,108 @@ def is_x11():
     """检查当前是否为 X11 运行环境"""
     return os.environ.get('DISPLAY') is not None
 
-def start_rustdesk_connection(target_id, target_password, extra_args):
-    if not target_id or not target_password:
-        return True
-
+def ensure_rustdesk_running():
     if shutil.which('rustdesk') is None:
         print("未检测到 rustdesk 命令，无法自动连接。")
         return False
 
-    env = os.environ.copy()
-    base_cmd = ['rustdesk', '--no-sandbox']
-    subprocess.Popen(base_cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    time.sleep(3)
+    if subprocess.run(['pgrep', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        return True
 
+    env = os.environ.copy()
+    subprocess.Popen(['rustdesk', '--no-sandbox'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(3)
+    return True
+
+def list_rustdesk_windows():
+    queries = [
+        ['xdotool', 'search', '--name', 'RustDesk'],
+        ['xdotool', 'search', '--name', 'rustdesk'],
+        ['xdotool', 'search', '--class', 'RustDesk'],
+        ['xdotool', 'search', '--class', 'rustdesk'],
+    ]
+
+    win_ids = set()
+    for query in queries:
+        try:
+            output = subprocess.check_output(query, text=True)
+            for wid in output.strip().split('\n'):
+                wid = wid.strip()
+                if wid:
+                    win_ids.add(wid)
+        except subprocess.CalledProcessError:
+            continue
+    return win_ids
+
+def connect_rustdesk(target_id, target_password, extra_args):
+    if not target_id or not target_password:
+        return set()
+
+    if not ensure_rustdesk_running():
+        return set()
+
+    before = list_rustdesk_windows()
+
+    env = os.environ.copy()
     cmd = ['rustdesk', '--no-sandbox', '--connect', target_id, '--password', target_password]
     if extra_args:
         cmd.extend(shlex.split(extra_args))
     subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(5)
-    return True
 
-def stop_rustdesk_connection():
-    subprocess.run(['pkill', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    after = list_rustdesk_windows()
+    return after - before
+
+def disconnect_rustdesk(win_ids):
+    if not win_ids:
+        return False
+
+    ok = False
+    for wid in win_ids:
+        try:
+            subprocess.run(['xdotool', 'windowkill', wid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            ok = True
+        except Exception:
+            continue
+    time.sleep(1)
+    return ok
 
 def get_rustdesk_window():
     """
     通过 xdotool 查找 RustDesk 远程控制窗口
     """
-    if os.environ.get('DISPLAY') == ':99':
-        if subprocess.run(['pgrep', '-x', 'rustdesk'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
-            return None
-        return {
-            'id': None,
-            'left': 0,
-            'top': 0,
-            'width': 1920,
-            'height': 1080,
-        }
-
     try:
-        queries = [
-            ['xdotool', 'search', '--name', 'RustDesk'],
-            ['xdotool', 'search', '--name', 'rustdesk'],
-            ['xdotool', 'search', '--class', 'RustDesk'],
-            ['xdotool', 'search', '--class', 'rustdesk'],
-        ]
-
-        win_ids = []
-        for query in queries:
-            try:
-                output = subprocess.check_output(query, text=True)
-                win_ids.extend([w for w in output.strip().split('\n') if w])
-            except subprocess.CalledProcessError:
-                continue
-
+        win_ids = list(list_rustdesk_windows())
         if not win_ids:
             return None
-        
+
+        best = None
+        best_area = 0
         for win_id in win_ids:
-            # 获取窗口几何信息
             geom_output = subprocess.check_output(['xdotool', 'getwindowgeometry', win_id], text=True)
-            # 解析几何信息
-            # Example output:
-            # Window 10485764
-            #   Position: 10, 50 (screen: 0)
-            #   Geometry: 1280x720
             lines = geom_output.split('\n')
             pos_line = next(l for l in lines if 'Position:' in l)
             geom_line = next(l for l in lines if 'Geometry:' in l)
             
-            # 提取坐标和大小
             pos_parts = pos_line.split(':')[1].split('(')[0].strip().split(',')
             left, top = int(pos_parts[0].strip()), int(pos_parts[1].strip())
             
             size_parts = geom_line.split(':')[1].strip().split('x')
             width, height = int(size_parts[0]), int(size_parts[1])
             
-            # 过滤掉太小的窗口（例如主面板），保留远控大窗口
-            if width > 800 and height > 600:
-                return {
+            area = width * height
+            if area > best_area:
+                best_area = area
+                best = {
                     'id': win_id,
                     'left': left,
                     'top': top,
                     'width': width,
-                    'height': height
+                    'height': height,
                 }
+
+        if best and best['width'] > 300 and best['height'] > 300:
+            return best
     except subprocess.CalledProcessError:
         pass
     except Exception as e:
@@ -200,23 +217,33 @@ def main():
         
     print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")
     print("依赖检查: 请确保系统中已安装 xdotool (用于窗口焦点控制)。")
-    print("运行策略：每轮开始前连接 RustDesk，执行动作后立刻断开连接。")
+    print("运行策略：RustDesk 常驻运行，每轮操作前建立连接，操作结束后断开连接。")
+
+    ensure_rustdesk_running()
     
     try:
         while True:
-            start_rustdesk_connection(args.target_id, args.target_password, args.rustdesk_extra_args)
+            connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
 
             try:
-                win_info = get_rustdesk_window()
+                win_info = None
+                for _ in range(10):
+                    win_info = get_rustdesk_window()
+                    if win_info:
+                        break
+                    time.sleep(1)
+
                 if not win_info:
-                    print(f"[{time.strftime('%H:%M:%S')}] 未找到符合条件的 RustDesk 窗口或 rustdesk 进程未启动。")
+                    print(f"[{time.strftime('%H:%M:%S')}] 未找到可操作的 RustDesk 窗口。")
                     time.sleep(10)
                     continue
 
                 safety_movement(win_info)
                 print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
             finally:
-                stop_rustdesk_connection()
+                if win_info and win_info.get('id'):
+                    connected_win_ids.add(win_info['id'])
+                disconnect_rustdesk(connected_win_ids)
 
             wait_time = random.randint(580, 640)
             print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
