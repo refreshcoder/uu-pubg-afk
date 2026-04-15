@@ -25,9 +25,18 @@ except Exception:
     pass
 
 import subprocess
-import pyautogui
 import random
 import time
+
+try:
+    import pyautogui
+except ModuleNotFoundError:
+    print("缺少依赖：pyautogui")
+    print("请在项目目录执行：")
+    print("1) python3 -m venv venv")
+    print("2) . venv/bin/activate")
+    print("3) pip install -r requirements_rustdesk.txt")
+    sys.exit(2)
 
 pyautogui.FAILSAFE = False
 RUSTDESK_DAEMON_LOG = '/tmp/rustdesk_daemon.log'
