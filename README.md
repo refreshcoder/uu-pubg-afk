@@ -49,6 +49,11 @@
    chmod +x install_and_run.sh
    ./install_and_run.sh
    ```
+   
+可选：把被控端 ID/密码写入 `.env`，避免每次运行脚本都手输（不要提交真实 `.env` 到仓库）：
+```bash
+cp .env.example .env
+```
 3. **对于拥有桌面环境的 Linux**：按下回车键（默认 `:0` 号显示器）即可。
 4. **对于纯命令行/无桌面的服务器（如云主机/Debian Server）**：脚本将全自动为您在后台完成以下操作：
    - 自动检测并下载安装 `rustdesk` 客户端 (如果系统尚未安装)

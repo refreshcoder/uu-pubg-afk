@@ -16,6 +16,12 @@ echo -e "${BLUE}================================================================
 echo -e "${BLUE}          RustDesk PUBG Anti-AFK (Linux CLI) 一键安装与运行脚本             ${NC}"
 echo -e "${BLUE}==============================================================================${NC}"
 
+if [ -f ".env" ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+
 # 1. 检查是否为 root 用户（安装系统依赖可能需要）
 if [ "$EUID" -ne 0 ]; then
   echo -e "${YELLOW}[提示] 您当前不是 root 用户。如果系统缺少依赖，后续步骤可能会提示您输入 sudo 密码。${NC}"
@@ -147,11 +153,17 @@ if [ -z "$DISPLAY" ] || [ -n "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; 
          x11vnc -display :99 -forever -shared -bg -nopw -quiet &
     fi
     
-    echo -e "\n${YELLOW}请输入被控端 (游戏主机) 的 RustDesk 信息（脚本每轮会自动连接并在结束后断开）：${NC}"
-    read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
-    RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
-    read -r -s -p "被控端 密码: " RUSTDESK_PWD
-    echo
+    RUSTDESK_ID="${RUSTDESK_ID:-${RUSTDESK_TARGET_ID:-}}"
+    RUSTDESK_PWD="${RUSTDESK_PWD:-${RUSTDESK_TARGET_PASSWORD:-}}"
+    RUSTDESK_EXTRA_ARGS="${RUSTDESK_EXTRA_ARGS:-${RUSTDESK_RUSTDESK_EXTRA_ARGS:-}}"
+
+    if [ -z "$RUSTDESK_ID" ] || [ -z "$RUSTDESK_PWD" ]; then
+        echo -e "\n${YELLOW}请输入被控端 (游戏主机) 的 RustDesk 信息（也可写入 .env 自动读取）：${NC}"
+        read -r -p "被控端 ID (如 123456789): " RUSTDESK_ID
+        RUSTDESK_ID="$(echo "$RUSTDESK_ID" | tr -d ' ')"
+        read -r -s -p "被控端 密码: " RUSTDESK_PWD
+        echo
+    fi
 
     read -r -p "额外 rustdesk 参数(可选，直接回车跳过): " RUSTDESK_EXTRA_ARGS
     

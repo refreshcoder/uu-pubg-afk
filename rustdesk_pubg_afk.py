@@ -41,6 +41,8 @@ except ModuleNotFoundError:
 pyautogui.FAILSAFE = False
 RUSTDESK_DAEMON_LOG = '/tmp/rustdesk_daemon.log'
 RUSTDESK_CONNECT_LOG = '/tmp/rustdesk_connect.log'
+CONNECT_TIMEOUT_SECONDS = 30
+CONNECT_RETRIES = 3
 
 def is_x11():
     """检查当前是否为 X11 运行环境"""
@@ -111,6 +113,29 @@ def restart_rustdesk():
     time.sleep(1)
     return ensure_rustdesk_running()
 
+def read_log_tail(path, max_bytes=8000):
+    try:
+        with open(path, 'rb') as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - max_bytes), os.SEEK_SET)
+            return f.read().decode('utf-8', errors='ignore')
+    except Exception:
+        return ''
+
+def is_connect_failed_from_log(text):
+    lowered = text.lower()
+    if 'security-v4.rustdesk.com/verify' in lowered:
+        return True
+    patterns = [
+        'invalid password',
+        'timeout',
+        'failed',
+        'error',
+        'cannot connect',
+    ]
+    return any(p in lowered for p in patterns)
+
 def connect_rustdesk(target_id, target_password, extra_args):
     target_id = (target_id or '').replace(' ', '').strip()
     target_password = (target_password or '').strip()
@@ -127,14 +152,21 @@ def connect_rustdesk(target_id, target_password, extra_args):
     cmd = ['rustdesk', '--no-sandbox', '--connect', target_id, '--password', target_password]
     if extra_args:
         cmd.extend(shlex.split(extra_args))
+    try:
+        with open(RUSTDESK_CONNECT_LOG, 'wb'):
+            pass
+    except Exception:
+        pass
     with open(RUSTDESK_CONNECT_LOG, 'ab') as fp:
         subprocess.Popen(cmd, env=env, stdout=fp, stderr=fp)
 
-    for _ in range(15):
+    for _ in range(CONNECT_TIMEOUT_SECONDS):
         after = list_rustdesk_windows()
         delta = after - before
         if delta:
             return delta
+        if is_connect_failed_from_log(read_log_tail(RUSTDESK_CONNECT_LOG)):
+            return set()
         time.sleep(1)
 
     after = list_rustdesk_windows()
@@ -282,10 +314,12 @@ def main():
     
     try:
         while True:
-            connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
-            if not connected_win_ids:
-                restart_rustdesk()
+            connected_win_ids = set()
+            for _ in range(CONNECT_RETRIES):
                 connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
+                if connected_win_ids:
+                    break
+                restart_rustdesk()
 
             try:
                 win_info = None
