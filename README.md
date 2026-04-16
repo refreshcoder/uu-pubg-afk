@@ -86,6 +86,10 @@ cp .env.example .env
      ```bash
      python uu_pubg_afk.py
      ```
+     如果电脑上没有 Python，或希望一键安装依赖并运行，可在 PowerShell（建议管理员）中执行：
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File .\run_uu_pubg_afk.ps1
+     ```
    - **Linux (RustDesk)**：通过一键脚本运行：
      ```bash
      ./install_and_run.sh
