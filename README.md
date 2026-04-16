@@ -54,6 +54,7 @@
 ```bash
 cp .env.example .env
 ```
+如果你使用自建 RustDesk Server OSS，需要在 `.env` 中额外填写 `RUSTDESK_ID_SERVER`、`RUSTDESK_RELAY_SERVER`、`RUSTDESK_KEY`，脚本会自动写入 RustDesk 的配置文件并应用。相关字段含义可参考 RustDesk 的自建服务器客户端配置说明。 [rustdesk.com docs](https://rustdesk.com/docs/en/self-host/client-configuration/)。
 3. **对于拥有桌面环境的 Linux**：按下回车键（默认 `:0` 号显示器）即可。
 4. **对于纯命令行/无桌面的服务器（如云主机/Debian Server）**：脚本将全自动为您在后台完成以下操作：
    - 自动检测并下载安装 `rustdesk` 客户端 (如果系统尚未安装)

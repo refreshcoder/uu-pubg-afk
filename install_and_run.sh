@@ -156,6 +156,105 @@ if [ -z "$DISPLAY" ] || [ -n "$DISPLAY_SOCKET" ] && [ ! -S "$DISPLAY_SOCKET" ]; 
     RUSTDESK_ID="${RUSTDESK_ID:-${RUSTDESK_TARGET_ID:-}}"
     RUSTDESK_PWD="${RUSTDESK_PWD:-${RUSTDESK_TARGET_PASSWORD:-}}"
     RUSTDESK_EXTRA_ARGS="${RUSTDESK_EXTRA_ARGS:-${RUSTDESK_RUSTDESK_EXTRA_ARGS:-}}"
+    RUSTDESK_ID_SERVER="${RUSTDESK_ID_SERVER:-}"
+    RUSTDESK_RELAY_SERVER="${RUSTDESK_RELAY_SERVER:-}"
+    RUSTDESK_KEY="${RUSTDESK_KEY:-}"
+
+    if [ -n "$RUSTDESK_ID_SERVER" ] || [ -n "$RUSTDESK_RELAY_SERVER" ] || [ -n "$RUSTDESK_KEY" ]; then
+        RUSTDESK_CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk"
+        RUSTDESK_CFG_FILE="$RUSTDESK_CFG_DIR/RustDesk2.toml"
+        mkdir -p "$RUSTDESK_CFG_DIR"
+        touch "$RUSTDESK_CFG_FILE" 2>/dev/null || true
+
+        RUSTDESK_ID_SERVER_HOST="${RUSTDESK_ID_SERVER%%:*}"
+
+        awk \
+          -v id_server="$RUSTDESK_ID_SERVER" \
+          -v relay_server="$RUSTDESK_RELAY_SERVER" \
+          -v server_key="$RUSTDESK_KEY" \
+          -v custom_server="$RUSTDESK_ID_SERVER_HOST" \
+          '
+          BEGIN {
+            found_rendezvous = 0;
+            in_options = 0;
+            found_options = 0;
+            found_custom = 0;
+            found_relay = 0;
+            found_key = 0;
+          }
+          function print_missing_options() {
+            if (!found_options) return;
+            if (custom_server != "" && !found_custom) print "custom-rendezvous-server = \x27" custom_server "\x27";
+            if (relay_server != "" && !found_relay) print "relay-server = \x27" relay_server "\x27";
+            if (server_key != "" && !found_key) print "key = \x27" server_key "\x27";
+          }
+          /^\[options\][[:space:]]*$/ {
+            found_options = 1;
+            in_options = 1;
+            print;
+            next;
+          }
+          /^\[[^]]+\][[:space:]]*$/ {
+            if (in_options) {
+              print_missing_options();
+              in_options = 0;
+            }
+            print;
+            next;
+          }
+          /^rendezvous_server[[:space:]]*=/ {
+            if (id_server != "") {
+              print "rendezvous_server = \x27" id_server "\x27";
+              found_rendezvous = 1;
+              next;
+            }
+          }
+          {
+            if (in_options) {
+              if ($0 ~ /^custom-rendezvous-server[[:space:]]*=/) {
+                if (custom_server != "") {
+                  print "custom-rendezvous-server = \x27" custom_server "\x27";
+                  found_custom = 1;
+                  next;
+                }
+              }
+              if ($0 ~ /^relay-server[[:space:]]*=/) {
+                if (relay_server != "") {
+                  print "relay-server = \x27" relay_server "\x27";
+                  found_relay = 1;
+                  next;
+                }
+              }
+              if ($0 ~ /^key[[:space:]]*=/) {
+                if (server_key != "") {
+                  print "key = \x27" server_key "\x27";
+                  found_key = 1;
+                  next;
+                }
+              }
+            }
+            print;
+          }
+          END {
+            if (in_options) {
+              print_missing_options();
+            }
+            if (id_server != "" && !found_rendezvous) {
+              print "";
+              print "rendezvous_server = \x27" id_server "\x27";
+            }
+            if (!found_options && (custom_server != "" || relay_server != "" || server_key != "")) {
+              print "";
+              print "[options]";
+              if (custom_server != "") print "custom-rendezvous-server = \x27" custom_server "\x27";
+              if (relay_server != "") print "relay-server = \x27" relay_server "\x27";
+              if (server_key != "") print "key = \x27" server_key "\x27";
+            }
+          }
+          ' "$RUSTDESK_CFG_FILE" > "${RUSTDESK_CFG_FILE}.tmp" && mv "${RUSTDESK_CFG_FILE}.tmp" "$RUSTDESK_CFG_FILE"
+
+        killall rustdesk 2>/dev/null || true
+    fi
 
     if [ -z "$RUSTDESK_ID" ] || [ -z "$RUSTDESK_PWD" ]; then
         echo -e "\n${YELLOW}请输入被控端 (游戏主机) 的 RustDesk 信息（也可写入 .env 自动读取）：${NC}"
