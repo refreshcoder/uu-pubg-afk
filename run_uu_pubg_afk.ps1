@@ -44,7 +44,9 @@ $python = Get-PythonCmd
 if (-not $python) {
   Write-Host "未检测到 Python，正在安装..." -ForegroundColor Yellow
   Install-Python
-  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+  $machinePath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
+  $userPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::User)
+  $env:Path = $machinePath + ";" + $userPath
   $python = Get-PythonCmd
 }
 
