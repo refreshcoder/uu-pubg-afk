@@ -14,14 +14,15 @@ if (-not (Test-Admin)) {
 }
 
 function Get-PythonCmd {
-  try {
-    $null = & py -3 -c "import sys; print(sys.version)" 2>$null
-    return @("py", "-3")
-  } catch {}
-  try {
-    $null = & python -c "import sys; print(sys.version)" 2>$null
-    return @("python")
-  } catch {}
+  if (Get-Command python -ErrorAction SilentlyContinue) {
+    return "python"
+  }
+  if (Get-Command py -ErrorAction SilentlyContinue) {
+    return "py"
+  }
+  if (Get-Command python3 -ErrorAction SilentlyContinue) {
+    return "python3"
+  }
   return $null
 }
 
@@ -43,6 +44,7 @@ $python = Get-PythonCmd
 if (-not $python) {
   Write-Host "未检测到 Python，正在安装..." -ForegroundColor Yellow
   Install-Python
+  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
   $python = Get-PythonCmd
 }
 
@@ -56,10 +58,9 @@ if (-not (Test-Path $venvDir)) {
 }
 
 $venvPython = Join-Path $venvDir "Scripts\python.exe"
-$pip = @($venvPython, "-m", "pip")
 
-& $pip install --upgrade pip
-& $pip install -r (Join-Path $ScriptDir "requirements.txt")
+& $venvPython -m pip install --upgrade pip
+& $venvPython -m pip install -r (Join-Path $ScriptDir "requirements.txt")
 
 Write-Host "依赖安装完成，正在启动脚本..." -ForegroundColor Green
 & $venvPython (Join-Path $ScriptDir "uu_pubg_afk.py")
