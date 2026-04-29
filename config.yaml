@@ -1,46 +1,64 @@
 run:
+  # 脚本在运行多少秒后自动退出，默认 21900 秒 (6小时5分钟)。设为 0 或不填则永不自动退出
   auto_exit_after_seconds: 21900
 
 loop:
+  # 每轮操作完成后，等待下一次操作的间隔时间随机范围 (秒)
   interval_seconds:
     min: 280
     max: 320
+  # 检测并激活远程窗口后，等待画面加载/初始化的延迟时间 (秒)
   window_init_wait_seconds: 15
 
 movement:
   mouse:
+    # 鼠标移动的水平坐标随机偏移范围 (相对于窗口中心点)
     offset_x:
       min: -60
       max: 60
+    # 鼠标移动的垂直坐标随机偏移范围 (相对于窗口中心点)
     offset_y:
       min: -20
       max: 20
+    # 鼠标移动到目标点所花费的时间 (秒)
     move_duration_seconds: 0.1
+    
     right_click:
+      # 长按鼠标右键的持续时间 (秒)
       hold_seconds: 0.1
+      # 两次独立点击鼠标右键之间的随机间隔时间范围 (秒)
       double_click_interval_seconds:
         min: 2
         max: 4
 
   keyboard:
+    # 第一段防掉线操作：将从中随机选择一个按键按下
     wasd_keys: ["w", "s", "a", "d"]
+    # 按下 WASD 中某个键的持续时间随机范围 (秒)
     hold_seconds:
       min: 0.1
       max: 0.18
+    # 执行相反方向按键进行位移补偿前，需要等待的极短时间 (秒)
     opp_sleep_seconds: 0.05
 
+    # 第二段防掉线操作：将从中随机选择按键执行多次点击
     qe_keys: ["q", "e"]
+    # 随机点击 Q/E 键的总次数范围
     qe_times:
       min: 2
       max: 5
+    # 每次按下 Q/E 键的持续时间随机范围 (秒)
     qe_hold_seconds:
       min: 0.03
       max: 0.07
+    # 连续两次 Q/E 按键动作之间的间隔时间随机范围 (秒)
     qe_interval_seconds:
       min: 0.05
       max: 0.15
 
 rustdesk:
   connection:
+    # 等待 RustDesk 远程连接建立的最大超时时间 (秒)
     connect_timeout_seconds: 30
+    # 连接失败时的最大重试次数
     connect_retries: 3
