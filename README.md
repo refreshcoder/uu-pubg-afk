@@ -96,6 +96,28 @@ cp .env.example .env
      *(如果您是通过 SSH 运行，且桌面的 DISPLAY 并非默认的 `:0`，请在运行后的提示中输入：`:1`)*
 4. **停止运行**：在终端中按下 `Ctrl + C` 即可安全停止脚本。
 
+## ⚙️ 公共配置 (config.yaml)
+
+仓库根目录提供一份公共配置文件 `config.yaml`，用于同时控制 Windows(UU) 与 Linux(RustDesk) 两套脚本的默认行为（循环间隔、窗口初始化等待、键鼠动作随机范围等）。
+
+如需在不改动仓库文件的情况下切换配置，可通过环境变量指定自定义路径：
+
+- Windows (PowerShell)
+  ```powershell
+  $env:PUBG_AFK_CONFIG = "D:\path\to\config.yaml"
+  ```
+- Linux (bash)
+  ```bash
+  export PUBG_AFK_CONFIG=/path/to/config.yaml
+  ```
+
+### 自动退出
+
+`config.yaml` 中的 `run.auto_exit_after_seconds` 控制脚本自动退出时间。
+
+- 默认：`21900` 秒（6 小时 5 分钟）
+- 设置为 `0`：表示不自动退出
+
 ## ⚠️ 注意事项
 
 - **分辨率与比例**：如果您中途缩放了 UU 远程窗口，脚本会自动重新计算中心区域，具备一定的自适应能力。
