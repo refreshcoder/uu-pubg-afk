@@ -3,6 +3,7 @@ import os
 import argparse
 import shlex
 import shutil
+from config_loader import load_config
 
 # 必须在导入任何可能初始化 GUI/X11 的库之前处理 DISPLAY 环境变量
 parser = argparse.ArgumentParser(description='RustDesk PUBG Anti-AFK Script (Linux CLI Mode)')
@@ -30,8 +31,11 @@ import time
 
 RUSTDESK_DAEMON_LOG = '/tmp/rustdesk_daemon.log'
 RUSTDESK_CONNECT_LOG = '/tmp/rustdesk_connect.log'
-CONNECT_TIMEOUT_SECONDS = 30
-CONNECT_RETRIES = 3
+config, config_error = load_config()
+if config_error:
+    print(f"[config] {config_error}, using built-in defaults")
+CONNECT_TIMEOUT_SECONDS = int(config["rustdesk"]["connection"]["connect_timeout_seconds"])
+CONNECT_RETRIES = int(config["rustdesk"]["connection"]["connect_retries"])
 
 def is_x11():
     """检查当前是否为 X11 运行环境"""
@@ -324,43 +328,61 @@ def safety_movement(win_info):
         center_x = win_info['left'] + win_info['width'] // 2
         center_y = win_info['top'] + win_info['height'] // 2
         
-    dx = random.randint(-60, 60)
-    dy = random.randint(-20, 20)
-    
-    move_duration = 0.1
+    dx = random.randint(int(config["movement"]["mouse"]["offset_x"]["min"]), int(config["movement"]["mouse"]["offset_x"]["max"]))
+    dy = random.randint(int(config["movement"]["mouse"]["offset_y"]["min"]), int(config["movement"]["mouse"]["offset_y"]["max"]))
+    move_duration = float(config["movement"]["mouse"]["move_duration_seconds"])
     xdotool_mouse_move(center_x + dx, center_y + dy)
 
     xdotool_mouse_down(3)
-    time.sleep(move_duration)
+    time.sleep(float(config["movement"]["mouse"]["right_click"]["hold_seconds"]))
     xdotool_mouse_up(3)
 
     xdotool_mouse_click(3)
-    time.sleep(random.uniform(2, 4))
+    time.sleep(
+        random.uniform(
+            float(config["movement"]["mouse"]["right_click"]["double_click_interval_seconds"]["min"]),
+            float(config["movement"]["mouse"]["right_click"]["double_click_interval_seconds"]["max"]),
+        )
+    )
     xdotool_mouse_click(3)
     
-    keys = ['w', 's', 'a', 'd']
+    keys = list(config["movement"]["keyboard"]["wasd_keys"])
     k = random.choice(keys)
-    hold_time = random.uniform(0.1, 0.18)
+    hold_time = random.uniform(
+        float(config["movement"]["keyboard"]["hold_seconds"]["min"]),
+        float(config["movement"]["keyboard"]["hold_seconds"]["max"]),
+    )
     
     xdotool_key_down(k)
     time.sleep(hold_time)
     xdotool_key_up(k)
     
     opp_map = {'w': 's', 's': 'w', 'a': 'd', 'd': 'a'}
-    time.sleep(0.05)
+    time.sleep(float(config["movement"]["keyboard"]["opp_sleep_seconds"]))
     
     xdotool_key_down(opp_map[k])
     time.sleep(hold_time)
     xdotool_key_up(opp_map[k])
 
-    extra_times = random.randint(2, 5)
+    extra_times = random.randint(
+        int(config["movement"]["keyboard"]["qe_times"]["min"]),
+        int(config["movement"]["keyboard"]["qe_times"]["max"]),
+    )
     for _ in range(extra_times):
-        key = random.choice(['q', 'e'])
-        press_time = random.uniform(0.03, 0.07)
+        key = random.choice(list(config["movement"]["keyboard"]["qe_keys"]))
+        press_time = random.uniform(
+            float(config["movement"]["keyboard"]["qe_hold_seconds"]["min"]),
+            float(config["movement"]["keyboard"]["qe_hold_seconds"]["max"]),
+        )
         xdotool_key_down(key)
         time.sleep(press_time)
         xdotool_key_up(key)
-        time.sleep(random.uniform(0.05, 0.15))
+        time.sleep(
+            random.uniform(
+                float(config["movement"]["keyboard"]["qe_interval_seconds"]["min"]),
+                float(config["movement"]["keyboard"]["qe_interval_seconds"]["max"]),
+            )
+        )
 
 def main():
     print(f"=== RustDesk PUBG 防掉线助手 (Linux CLI 模式) 已启动 ===")
@@ -381,9 +403,15 @@ def main():
         sys.exit(2)
 
     ensure_rustdesk_running()
+    start_ts = time.time()
+    auto_exit_after = float(config["run"]["auto_exit_after_seconds"])
     
     try:
         while True:
+            if auto_exit_after > 0 and (time.time() - start_ts) >= auto_exit_after:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
+
             connected_win_ids = set()
             for _ in range(CONNECT_RETRIES):
                 connected_win_ids = connect_rustdesk(args.target_id, args.target_password, args.rustdesk_extra_args)
@@ -404,7 +432,7 @@ def main():
                     time.sleep(10)
                     continue
 
-                time.sleep(15)
+                time.sleep(float(config["loop"]["window_init_wait_seconds"]))
 
                 safety_movement(win_info)
                 print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
@@ -413,9 +441,20 @@ def main():
                     connected_win_ids.add(win_info['id'])
                 disconnect_rustdesk(connected_win_ids)
 
-            wait_time = random.randint(280, 320)
-            print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
-            time.sleep(wait_time)
+            wait_time = random.randint(
+                int(config["loop"]["interval_seconds"]["min"]),
+                int(config["loop"]["interval_seconds"]["max"]),
+            )
+            remaining = (start_ts + auto_exit_after) - time.time() if auto_exit_after > 0 else None
+            if remaining is not None and remaining <= 0:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
+            sleep_time = min(wait_time, remaining) if remaining is not None else wait_time
+            print(f"[{time.strftime('%H:%M:%S')}] 等待 {int(sleep_time)} 秒后进行下一次扫描...")
+            time.sleep(max(0, sleep_time))
+            if remaining is not None and sleep_time < wait_time:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
             
     except KeyboardInterrupt:
         print("\n=== 脚本已手动停止 ===")
