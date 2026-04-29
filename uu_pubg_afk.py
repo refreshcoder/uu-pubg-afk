@@ -4,9 +4,13 @@ import ctypes
 from ctypes import wintypes
 import random
 import time
+from config_loader import load_config
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+config, config_error = load_config()
+if config_error:
+    print(f"[config] {config_error}, using built-in defaults")
 
 SW_RESTORE = 9
 SW_SHOW = 5
@@ -196,43 +200,80 @@ def restore_desktop_state(state):
 
 def safety_movement(win):
     """执行极短防掉线动作 (原地踏步)"""
-    dx = random.randint(-60, 60)
-    dy = random.randint(-20, 20)
+    dx = random.randint(int(config["movement"]["mouse"]["offset_x"]["min"]), int(config["movement"]["mouse"]["offset_x"]["max"]))
+    dy = random.randint(int(config["movement"]["mouse"]["offset_y"]["min"]), int(config["movement"]["mouse"]["offset_y"]["max"]))
     center_x = win.left + win.width // 2
     center_y = win.top + win.height // 2
-    pydirectinput.moveTo(center_x + dx, center_y + dy, duration=0.2)
+    pydirectinput.moveTo(
+        center_x + dx,
+        center_y + dy,
+        duration=float(config["movement"]["mouse"]["move_duration_seconds"]),
+    )
 
-    keys = ['w', 's', 'a', 'd']
+    pydirectinput.mouseDown(button="right")
+    time.sleep(float(config["movement"]["mouse"]["right_click"]["hold_seconds"]))
+    pydirectinput.mouseUp(button="right")
+
+    pydirectinput.click(button="right")
+    time.sleep(
+        random.uniform(
+            float(config["movement"]["mouse"]["right_click"]["double_click_interval_seconds"]["min"]),
+            float(config["movement"]["mouse"]["right_click"]["double_click_interval_seconds"]["max"]),
+        )
+    )
+    pydirectinput.click(button="right")
+
+    keys = list(config["movement"]["keyboard"]["wasd_keys"])
     k = random.choice(keys)
-    hold_time = random.uniform(0.1, 0.18)
+    hold_time = random.uniform(
+        float(config["movement"]["keyboard"]["hold_seconds"]["min"]),
+        float(config["movement"]["keyboard"]["hold_seconds"]["max"]),
+    )
 
     pydirectinput.keyDown(k)
     time.sleep(hold_time)
     pydirectinput.keyUp(k)
 
     opp_map = {'w': 's', 's': 'w', 'a': 'd', 'd': 'a'}
-    time.sleep(0.05)
+    time.sleep(float(config["movement"]["keyboard"]["opp_sleep_seconds"]))
 
     pydirectinput.keyDown(opp_map[k])
     time.sleep(hold_time)
     pydirectinput.keyUp(opp_map[k])
 
-    extra_times = random.randint(2, 5)
+    extra_times = random.randint(
+        int(config["movement"]["keyboard"]["qe_times"]["min"]),
+        int(config["movement"]["keyboard"]["qe_times"]["max"]),
+    )
     for _ in range(extra_times):
-        key = random.choice(['q', 'e'])
-        press_time = random.uniform(0.03, 0.07)
+        key = random.choice(list(config["movement"]["keyboard"]["qe_keys"]))
+        press_time = random.uniform(
+            float(config["movement"]["keyboard"]["qe_hold_seconds"]["min"]),
+            float(config["movement"]["keyboard"]["qe_hold_seconds"]["max"]),
+        )
         pydirectinput.keyDown(key)
         time.sleep(press_time)
         pydirectinput.keyUp(key)
-        time.sleep(random.uniform(0.05, 0.15))
+        time.sleep(
+            random.uniform(
+                float(config["movement"]["keyboard"]["qe_interval_seconds"]["min"]),
+                float(config["movement"]["keyboard"]["qe_interval_seconds"]["max"]),
+            )
+        )
 
 def main():
     print("=== UU远程 PUBG 防掉线助手已启动 ===")
     print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")
     print("运行模式：每轮开始恢复并激活 HOME 窗口，结束后重新最小化。")
+    start_ts = time.time()
+    auto_exit_after = float(config["run"]["auto_exit_after_seconds"])
 
     try:
         while True:
+            if auto_exit_after > 0 and (time.time() - start_ts) >= auto_exit_after:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
+
             win = get_remote_window()
             if not win:
                 print(f"[{time.strftime('%H:%M:%S')}] 未找到符合条件的 HOME 窗口，请检查 UU 远程是否已连接...")
@@ -252,6 +293,7 @@ def main():
                 f"本轮开始前焦点窗口: {describe_window(desktop_state['active_window'])}，"
                 f"鼠标位置: {desktop_state['cursor_pos']}"
             )
+            time.sleep(float(config["loop"]["window_init_wait_seconds"]))
 
             try:
                 safety_movement(win)
@@ -265,9 +307,20 @@ def main():
                     f"鼠标位置: {desktop_state['cursor_pos']}"
                 )
 
-            wait_time = random.randint(120, 180)
-            print(f"[{time.strftime('%H:%M:%S')}] 等待 {wait_time} 秒后进行下一次扫描...")
-            time.sleep(wait_time)
+            wait_time = random.randint(
+                int(config["loop"]["interval_seconds"]["min"]),
+                int(config["loop"]["interval_seconds"]["max"]),
+            )
+            remaining = (start_ts + auto_exit_after) - time.time() if auto_exit_after > 0 else None
+            if remaining is not None and remaining <= 0:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
+            sleep_time = min(wait_time, remaining) if remaining is not None else wait_time
+            print(f"[{time.strftime('%H:%M:%S')}] 等待 {int(sleep_time)} 秒后进行下一次扫描...")
+            time.sleep(max(0, sleep_time))
+            if remaining is not None and sleep_time < wait_time:
+                print(f"[{time.strftime('%H:%M:%S')}] Auto exit after {int(auto_exit_after)} seconds.")
+                break
 
     except KeyboardInterrupt:
         print("\n=== 脚本已手动停止 ===")
