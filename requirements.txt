@@ -1,8 +1,2 @@
 pygetwindow
 pydirectinput
-pyautogui
-easyocr
-Pillow
-mss
-numpy
-opencv-python

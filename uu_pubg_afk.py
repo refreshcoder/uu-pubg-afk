@@ -1,22 +1,13 @@
 import pygetwindow as gw
 import pydirectinput
-import easyocr
-import numpy as np
-from PIL import ImageGrab
 import ctypes
 from ctypes import wintypes
 import random
 import time
 
-# 初始化 OCR 引擎 (首次运行会自动下载模型，请耐心等待)
-print("正在加载 OCR 模型（默认使用 CPU）...")
-reader = easyocr.Reader(['ch_sim', 'en'], gpu=False)
-print("OCR 模型加载完成！当前模式：CPU OCR")
-
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
-OCR_INTERVAL_SECONDS = 10 * 60
 SW_RESTORE = 9
 SW_SHOW = 5
 SW_MINIMIZE = 6
@@ -203,44 +194,6 @@ def restore_desktop_state(state):
         except Exception as e:
             print(f"恢复鼠标位置失败: {e}")
 
-def check_kicked_with_ocr(win):
-    """
-    使用 OCR 检测窗口中心区域的异常文字
-    """
-    x1 = win.left + (win.width * 0.25)
-    y1 = win.top + (win.height * 0.25)
-    x2 = win.left + (win.width * 0.75)
-    y2 = win.top + (win.height * 0.75)
-
-    bbox = (int(x1), int(y1), int(x2), int(y2))
-    screen = ImageGrab.grab(bbox=bbox)
-    img_np = np.array(screen)
-    results = reader.readtext(img_np, detail=1)
-
-    keywords = ["错误", "錯誤", "Error", "error"]
-
-    for bbox_coords, text, prob in results:
-        for key in keywords:
-            if key in text:
-                print(f"[{time.strftime('%H:%M:%S')}] 警告！检测到异常文字: '{text}' (置信度: {prob:.2f})")
-
-                if "确定" in text or "确认" in text:
-                    center_x = (bbox_coords[0][0] + bbox_coords[1][0]) / 2
-                    center_y = (bbox_coords[0][1] + bbox_coords[2][1]) / 2
-                    abs_click_x = int(x1 + center_x)
-                    abs_click_y = int(y1 + center_y)
-                    print(f"尝试自动点击 '确定' 按钮，坐标: ({abs_click_x}, {abs_click_y})")
-                    pydirectinput.click(abs_click_x, abs_click_y)
-
-                return True
-    return False
-
-def should_run_ocr(last_ocr_time):
-    """控制 OCR 的执行频率，默认每 10 分钟最多执行一次。"""
-    if last_ocr_time is None:
-        return True
-    return (time.time() - last_ocr_time) >= OCR_INTERVAL_SECONDS
-
 def safety_movement(win):
     """执行极短防掉线动作 (原地踏步)"""
     dx = random.randint(-60, 60)
@@ -276,10 +229,7 @@ def safety_movement(win):
 def main():
     print("=== UU远程 PUBG 防掉线助手已启动 ===")
     print("提示：请按 Ctrl+C 停止脚本。建议让角色在游戏中面壁站立。")
-    print("OCR 检测频率：每 10 分钟最多执行一次。")
     print("运行模式：每轮开始恢复并激活 HOME 窗口，结束后重新最小化。")
-
-    last_ocr_time = None
 
     try:
         while True:
@@ -304,23 +254,8 @@ def main():
             )
 
             try:
-                kicked = False
-                if should_run_ocr(last_ocr_time):
-                    print(f"[{time.strftime('%H:%M:%S')}] 开始执行 OCR 检测。")
-                    kicked = check_kicked_with_ocr(win)
-                    last_ocr_time = time.time()
-
-                    if kicked:
-                        print(f"[{time.strftime('%H:%M:%S')}] 状态：画面异常，暂停防掉线动作，等待人工处理或自动重连...")
-                        time.sleep(30)
-                    else:
-                        safety_movement(win)
-                        print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
-                else:
-                    next_ocr_in = int(max(0, OCR_INTERVAL_SECONDS - (time.time() - last_ocr_time)))
-                    print(f"[{time.strftime('%H:%M:%S')}] 跳过 OCR 检测，距离下次 OCR 约还有 {next_ocr_in} 秒。")
-                    safety_movement(win)
-                    print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
+                safety_movement(win)
+                print(f"[{time.strftime('%H:%M:%S')}] 状态：已执行极微量位置抵消动作。")
             finally:
                 restore_desktop_state(desktop_state)
                 minimize_window(win)
