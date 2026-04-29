@@ -45,7 +45,7 @@ if [ -n "$MISSING_PKGS" ]; then
     echo -e "${YELLOW}发现缺失依赖: $MISSING_PKGS${NC}"
     echo "正在使用 apt-get 安装 (由于包含桌面组件，可能需要几分钟)..."
     sudo apt-get update
-    sudo apt-get install -y $MISSING_PKGS
+    sudo env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get install -y $MISSING_PKGS
     if [ $? -ne 0 ]; then
         echo -e "${RED}[错误] 系统依赖安装失败，请检查您的网络或软件源配置。${NC}"
         exit 1
@@ -75,7 +75,7 @@ install_rustdesk() {
     fi
 
     echo "正在安装 RustDesk..."
-    sudo apt-get install -y /tmp/rustdesk.deb
+    sudo env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get install -y /tmp/rustdesk.deb
     if [ $? -ne 0 ]; then
          echo -e "${RED}[错误] RustDesk 安装失败。${NC}"
          exit 1
