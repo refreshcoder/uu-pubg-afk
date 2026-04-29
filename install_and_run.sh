@@ -58,9 +58,43 @@ fi
 echo -e "\n${GREEN}[2/5] 检查 RustDesk 客户端...${NC}"
 if ! command -v rustdesk >/dev/null 2>&1; then
     echo -e "${YELLOW}未检测到 RustDesk 客户端，正在为您自动下载并安装...${NC}"
-    # 获取最新的 RustDesk deb 下载链接 (这里使用 GitHub API 或固定版本)
-    # 为了稳定，这里使用 1.2.3 稳定版作为 fallback
-    RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb"
+    RUSTDESK_DEB_URL="$(python3 - <<'PY'
+import json
+import platform
+import re
+import sys
+import urllib.request
+
+api = "https://api.github.com/repos/rustdesk/rustdesk/releases/latest"
+req = urllib.request.Request(api, headers={"Accept": "application/vnd.github+json", "User-Agent": "uu-pubg-afk-installer"})
+with urllib.request.urlopen(req, timeout=20) as r:
+    data = json.load(r)
+
+assets = data.get("assets", []) or []
+urls = [a.get("browser_download_url", "") for a in assets if isinstance(a, dict)]
+
+arch = platform.machine().lower()
+patterns = []
+if arch in ("x86_64", "amd64"):
+    patterns = [r"rustdesk-.*-x86_64\.deb$"]
+elif arch in ("aarch64", "arm64"):
+    patterns = [r"rustdesk-.*-(aarch64|arm64)\.deb$"]
+else:
+    patterns = [r"rustdesk-.*\.deb$"]
+
+for pat in patterns:
+    rx = re.compile(pat)
+    for u in urls:
+        if rx.search(u):
+            print(u)
+            sys.exit(0)
+
+sys.exit(1)
+PY
+)"
+    if [ -z "$RUSTDESK_DEB_URL" ]; then
+        RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb"
+    fi
     
     echo "正在下载 RustDesk: $RUSTDESK_DEB_URL"
     wget -qO /tmp/rustdesk.deb "$RUSTDESK_DEB_URL"
