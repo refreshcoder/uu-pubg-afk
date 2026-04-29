@@ -13,25 +13,36 @@
 - 🎯 **智能窗口锁定**：精准锁定实际的远程桌面推流窗口。
 - 🚶 **极微量位移抵消**：采用“0.1秒按键+反向补偿”的镜像抵消算法，确保角色在游戏中原地踏步，不乱跑。
 - 🖱️ **防失焦鼠标微动**：计算窗口几何中心进行相对微调，防止鼠标随时间推移甩出远程窗口导致失焦。
-- ⚡ **性能优化**：每轮仅执行极少量键鼠操作，尽量降低主控机资源占用。
+- ⚡ **主控机资源优化机制**：
+  - **Windows (零打扰)**：在每一轮操作前，强行唤醒并置顶 UU 远程窗口执行极短的键鼠动作，完成后立刻将焦点和鼠标位置还给用户，并将远程窗口最小化，不影响您平时看网页或工作。
+  - **Linux (随用随连)**：采用“按需连接”生命周期管理机制，每次循环先唤醒 RustDesk 建立连接，动作执行完毕后自动断开并销毁窗口，极大节省服务器带宽和性能。
+- ☁️ **全自动无头服务器支持**：对于没有物理显示器的云服务器（如 Ubuntu/Debian Server），一键脚本会自动搭建 Xvfb 虚拟显示器和 x11vnc 环境，支持无缝挂机。
 
 ## 🛠️ 安装说明
 
 ### Windows (UU 远程版)
-1. 确保您的电脑（主控机）已安装 [Python 3.8+](https://www.python.org/downloads/)。
-2. 克隆本仓库或下载源码到本地：
+我们为您提供了一个一键安装与运行 PowerShell 脚本，它会自动检测/安装 Python，创建虚拟环境并启动防掉线功能。
+
+1. 克隆本仓库或下载源码到本地：
    ```bash
    git clone https://github.com/yourusername/uu-pubg-afk.git
    cd uu-pubg-afk
    ```
-3. 创建并激活虚拟环境：
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate
+2. **小白一键启动 (推荐)**：
+   以**管理员身份**打开 PowerShell（按 Win 键搜索 PowerShell，右键“以管理员身份运行”），然后执行以下命令：
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\run_uu_pubg_afk.ps1
    ```
-4. 安装相关依赖包：
+
+*(如果您希望手动控制依赖和环境，请参考下方的详细手动启动步骤：)*
+3. **详细手动启动**：
+   确保已安装 [Python 3.10+](https://www.python.org/downloads/)。
+   在终端中运行以下命令创建虚拟环境并安装依赖：
    ```bash
+   python -m venv venv_win
+   venv_win\Scripts\activate
    pip install -r requirements.txt
+   python uu_pubg_afk.py
    ```
 
 ### Linux (RustDesk 远控版 - 纯 CLI/云主机无头兼容)
@@ -69,26 +80,12 @@ cp .env.example .env
 ./rustdesk_connect_check.sh <您的远控ID> <您的密码> :99
 ```
 
-> *如果您希望手动安装，可以参考下方的老版本安装方式：*
-> ```bash
-> sudo apt-get install xdotool python3-tk python3-dev
-> pip3 install -r requirements_rustdesk.txt
-> python3 rustdesk_pubg_afk.py --display :0
-> ```
-
 ## 🚀 使用指南
 
 1. **准备工作**：在被控机（游戏机）打开 PUBG，建议让角色在安全区域**面壁站立**（这样可以利用游戏内的物理碰撞体积进一步防止位移误差）。
 2. **连接远程**：在主控机打开远程软件（UU远程 或 RustDesk）并连接到被控机，确保能看到游戏画面。
 3. **运行脚本**：
-   - **Windows (UU远程)**：以管理员身份打开终端运行：
-     ```bash
-     python uu_pubg_afk.py
-     ```
-     如果电脑上没有 Python，或希望一键安装依赖并运行，可在 PowerShell（建议管理员）中执行：
-     ```powershell
-     powershell -ExecutionPolicy Bypass -File .\run_uu_pubg_afk.ps1
-     ```
+   - **Windows (UU远程)**：请参考上方 [安装说明 - 小白一键启动] 的指令，在 PowerShell 以管理员权限执行 `run_uu_pubg_afk.ps1`。
    - **Linux (RustDesk)**：通过一键脚本运行：
      ```bash
      ./install_and_run.sh
