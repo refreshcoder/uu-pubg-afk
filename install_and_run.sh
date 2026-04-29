@@ -56,24 +56,24 @@ fi
 
 # 2.5 检查并安装 RustDesk 客户端
 echo -e "\n${GREEN}[2/5] 检查 RustDesk 客户端...${NC}"
-if ! command -v rustdesk >/dev/null 2>&1; then
-    echo -e "${YELLOW}未检测到 RustDesk 客户端，正在为您自动下载并安装...${NC}"
-    arch="$(dpkg --print-architecture 2>/dev/null || true)"
-    if [ "$arch" = "amd64" ]; then
-        RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.4.6/rustdesk-1.4.6-x86_64.deb"
-    elif [ "$arch" = "arm64" ]; then
-        RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.4.6/rustdesk-1.4.6-aarch64.deb"
-    else
-        RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/1.4.6/rustdesk-1.4.6-x86_64.deb"
-    fi
-    
+TARGET_RUSTDESK_VERSION="1.4.6"
+arch="$(dpkg --print-architecture 2>/dev/null || true)"
+if [ "$arch" = "amd64" ]; then
+    RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/${TARGET_RUSTDESK_VERSION}/rustdesk-${TARGET_RUSTDESK_VERSION}-x86_64.deb"
+elif [ "$arch" = "arm64" ]; then
+    RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/${TARGET_RUSTDESK_VERSION}/rustdesk-${TARGET_RUSTDESK_VERSION}-aarch64.deb"
+else
+    RUSTDESK_DEB_URL="https://github.com/rustdesk/rustdesk/releases/download/${TARGET_RUSTDESK_VERSION}/rustdesk-${TARGET_RUSTDESK_VERSION}-x86_64.deb"
+fi
+
+install_rustdesk() {
     echo "正在下载 RustDesk: $RUSTDESK_DEB_URL"
     wget -qO /tmp/rustdesk.deb "$RUSTDESK_DEB_URL"
     if [ $? -ne 0 ]; then
         echo -e "${RED}[错误] RustDesk 下载失败，请检查网络或稍后手动安装。${NC}"
         exit 1
     fi
-    
+
     echo "正在安装 RustDesk..."
     sudo apt-get install -y /tmp/rustdesk.deb
     if [ $? -ne 0 ]; then
@@ -82,8 +82,33 @@ if ! command -v rustdesk >/dev/null 2>&1; then
     fi
     rm /tmp/rustdesk.deb
     echo "RustDesk 安装完成！"
+}
+
+if ! command -v rustdesk >/dev/null 2>&1; then
+    echo -e "${YELLOW}未检测到 RustDesk 客户端，正在为您自动下载并安装...${NC}"
+    install_rustdesk
 else
-    echo "RustDesk 已安装！"
+    INSTALLED_RUSTDESK_VERSION="$(rustdesk --version 2>/dev/null | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+    if [ -n "$INSTALLED_RUSTDESK_VERSION" ] && [ "$INSTALLED_RUSTDESK_VERSION" != "$TARGET_RUSTDESK_VERSION" ]; then
+        echo -e "${YELLOW}检测到 RustDesk 已安装 (当前版本: $INSTALLED_RUSTDESK_VERSION)，目标版本: $TARGET_RUSTDESK_VERSION${NC}"
+        UPDATE_RUSTDESK=0
+        for i in 5 4 3 2 1; do
+            printf "\r按回车键更新 RustDesk（%ds 后默认跳过）: " "$i"
+            if read -r -t 1; then
+                UPDATE_RUSTDESK=1
+                break
+            fi
+        done
+        echo
+
+        if [ "$UPDATE_RUSTDESK" -eq 1 ]; then
+            install_rustdesk
+        else
+            echo "已跳过 RustDesk 更新。"
+        fi
+    else
+        echo "RustDesk 已安装！"
+    fi
 fi
 
 # 3. 检查代码仓库是否完整
