@@ -32,7 +32,7 @@ echo -e "\n${GREEN}[1/5] 检查系统依赖...${NC}"
 
 # 精简依赖：去除了重量级的 fluxbox，保留 Xvfb, x11vnc 提供无头推流能力
 # 新增 libegl1 和 libgl1 解决 RustDesk 在无头环境启动时缺失 OpenGL 硬件渲染库报错的问题
-REQUIRED_PKGS="xdotool xvfb x11vnc libegl1 libgl1 python3 python3-pip python3-tk python3-dev python3-venv"
+REQUIRED_PKGS="xdotool xvfb x11vnc scrot libegl1 libgl1 python3 python3-pip python3-tk python3-dev python3-venv"
 MISSING_PKGS=""
 
 for pkg in $REQUIRED_PKGS; do

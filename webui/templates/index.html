@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PUBG Anti-AFK 控制台</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <h1>PUBG Anti-AFK 多设备控制台</h1>
+          <p>集中管理 RustDesk 设备，按需启动/停止，并留存最近截图。</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="/devices/new">新增设备</a>
+          <a class="btn ghost" href="https://github.com/refreshcoder/uu-pubg-afk" target="_blank">Repo</a>
+        </div>
+      </div>
+
+      <div class="grid">
+        {% for row in rows %}
+        <div class="card">
+          <div class="inner">
+            <div class="row">
+              <div class="title">
+                <div class="name"><a href="/devices/{{ row.device.key }}">{{ row.device.name }}</a></div>
+                <div class="meta">ID: {{ row.device.target_id[:3] }}***{{ row.device.target_id[-3:] }} · DISPLAY {{ row.device.display }}</div>
+              </div>
+              <div class="status">
+                <span class="dot {{ row.status }}"></span>
+                <span>{{ row.status }}</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="pill">
+                <strong>PID</strong> {{ row.pid or "-" }}
+              </div>
+              <div class="pill">
+                <strong>剩余</strong>
+                {% if row.remaining is not none %}
+                <span id="remain-{{ row.device.key }}" data-remain="{{ row.remaining }}">{{ row.remaining }}s</span>
+                {% else %}
+                -
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="btns">
+              <button class="btn primary" onclick="PUBG_AFK_UI.startDevice('{{ row.device.key }}')">开始</button>
+              <button class="btn danger" onclick="PUBG_AFK_UI.stopDevice('{{ row.device.key }}')">停止</button>
+              <a class="btn" href="/devices/{{ row.device.key }}">详情</a>
+              <a class="btn" href="/devices/{{ row.device.key }}/edit">编辑</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      document.querySelectorAll("[data-remain]").forEach((el) => {
+        const sec = parseInt(el.getAttribute("data-remain"), 10)
+        el.textContent = PUBG_AFK_UI.fmtRemaining(sec)
+      })
+    </script>
+  </body>
+</html>
+

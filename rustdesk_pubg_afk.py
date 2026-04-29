@@ -37,6 +37,50 @@ if config_error:
 CONNECT_TIMEOUT_SECONDS = int(config["rustdesk"]["connection"]["connect_timeout_seconds"])
 CONNECT_RETRIES = int(config["rustdesk"]["connection"]["connect_retries"])
 
+SCREENSHOT_DIR = os.environ.get("PUBG_AFK_SCREENSHOT_DIR", "").strip()
+
+def maybe_save_screenshot():
+    if not SCREENSHOT_DIR:
+        return False
+
+    try:
+        os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+    except Exception:
+        return False
+
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    out_path = os.path.join(SCREENSHOT_DIR, f"{ts}.png")
+
+    try:
+        if shutil.which("scrot"):
+            subprocess.run(["scrot", out_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        elif shutil.which("import"):
+            subprocess.run(["import", "-window", "root", out_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        else:
+            return False
+    except Exception:
+        return False
+
+    try:
+        items = []
+        for name in os.listdir(SCREENSHOT_DIR):
+            if name.lower().endswith(".png"):
+                p = os.path.join(SCREENSHOT_DIR, name)
+                try:
+                    items.append((os.path.getmtime(p), p))
+                except Exception:
+                    continue
+        items.sort(reverse=True)
+        for _, p in items[10:]:
+            try:
+                os.remove(p)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    return True
+
 def is_x11():
     """检查当前是否为 X11 运行环境"""
     return os.environ.get('DISPLAY') is not None
@@ -383,6 +427,7 @@ def safety_movement(win_info):
                 float(config["movement"]["keyboard"]["qe_interval_seconds"]["max"]),
             )
         )
+    maybe_save_screenshot()
 
 def main():
     print(f"=== RustDesk PUBG 防掉线助手 (Linux CLI 模式) 已启动 ===")

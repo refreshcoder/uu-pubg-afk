@@ -115,6 +115,39 @@ cp .env.example .env
 - 默认：`21900` 秒（6 小时 5 分钟）
 - 设置为 `0`：表示不自动退出
 
+## 🖥️ WebUI（多设备控制）
+
+如果你需要在一台 Linux 主控机上同时管理多台 RustDesk 设备（配置 ID/密码、每台设备独立参数、可视化启动/停止、截图留存），可以使用本仓库内置的 WebUI。
+
+### 小白版（推荐）
+
+1. 安装 WebUI 依赖：
+   ```bash
+   python3 -m pip install -r requirements_webui.txt
+   ```
+2. 启动 WebUI（默认仅本机可访问）：
+   ```bash
+   python3 -m uvicorn webui.app:app --host 127.0.0.1 --port 8000
+   ```
+3. 浏览器打开：
+   - `http://127.0.0.1:8000/`
+4. 在页面中新增设备，填写设备名称、RustDesk ID、密码，然后点击“开始”，输入运行时长（小时/分钟）。
+
+### 详细版（可配置项说明）
+
+- 数据落盘目录：
+  - 默认：`./data/`（设备配置保存在 `data/devices.yaml`，运行日志/截图保存在 `data/runtime/<device>/`）
+  - 可通过环境变量覆盖：`PUBG_AFK_DATA_DIR=/path/to/data`
+- 每台设备的独立配置：
+  - 在设备编辑页填写“覆盖配置（YAML）”，该 YAML 会与仓库根目录的 `config.yaml` 深度合并
+  - 每次点击“开始”时，WebUI 会将本次运行时长写入 `run.auto_exit_after_seconds`
+- 截图机制：
+  - WebUI 启动脚本时会自动设置 `PUBG_AFK_SCREENSHOT_DIR`
+  - 脚本会在每次防掉线动作后尝试保存一张 PNG，并仅保留最近 10 张
+  - Linux 推荐安装 `scrot`（`install_and_run.sh` 已包含）
+
+当前版本 WebUI 的 runner 默认对接 **Linux + RustDesk** 场景；Windows(UU) 可作为后续扩展。
+
 ## ⚠️ 注意事项
 
 - **分辨率与比例**：如果您中途缩放了 UU 远程窗口，脚本会自动重新计算中心区域，具备一定的自适应能力。
